@@ -24,7 +24,7 @@ class VisualPicker:
         self.root.config(cursor="cross")
         
         self.label_text = f"HÃY CLICK VÀO NÚT: [{label.upper()}]"
-        self.canvas = tk.Canvas(self.root, cursor="cross", bg="blue") # Đổi sang màu xanh dương cho dễ nhìn
+        self.canvas = tk.Canvas(self.root, cursor="cross", bg="blue")
         self.canvas.pack(fill="both", expand=True)
         
         self.text_id = self.canvas.create_text(
@@ -102,17 +102,16 @@ class autoBackupSMILE:
             mouse.click(button='left', coords=(x, y))
             time.sleep(3)
 
-            # BƯỚC 4: Tự động Đăng nhập lần 2 (Chỉ nhập PASS)
+            # BƯỚC 4: Tự động Đăng nhập lần 2 (Nhập trực tiếp mật khẩu)
             print("Step 4: Đang tự động xác thực mật khẩu lần 2...")
-            # Đợi bảng Login 2 xuất hiện
             auth_wait_start = time.time()
             while time.time() - auth_wait_start < 10:
                 top_win = self.app.top_window()
                 if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
                     print("   [+] Đã thấy bảng xác thực. Đang nhập mật khẩu...")
                     top_win.set_focus()
-                    # Vì USER 'IT' đã có sẵn, nhấn TAB để chắc chắn nhảy vào ô Pass (hoặc nhập luôn)
-                    send_keys("{TAB}" + PASS + "{ENTER}")
+                    # Nhập trực tiếp mật khẩu và Enter (không dùng TAB)
+                    send_keys(PASS + "{ENTER}")
                     time.sleep(5)
                     break
                 time.sleep(1)
