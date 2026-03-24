@@ -60,18 +60,18 @@ class autoBackupSMILE:
         """Tự động tìm kiếm ổ đĩa hoặc thư mục Google Drive trên Windows"""
         # 1. Kiểm tra ổ đĩa G: (Mặc định của Google Drive Desktop)
         if os.path.exists(r"G:\My Drive"):
-            return r"G:\My Drive\SMILE_Backup"
+            return r"G:\My Drive\SMILE BACKUP"
         
         # 2. Kiểm tra các ổ đĩa khác từ H-Z
         import string
         for letter in string.ascii_uppercase[7:]: # H to Z
             path = f"{letter}:\\My Drive"
             if os.path.exists(path):
-                return f"{letter}:\\My Drive\\SMILE_Backup"
+                return f"{letter}:\\My Drive\\SMILE BACKUP"
         
         # 3. Kiểm tra trong thư mục User mặc định
         user_profile = os.environ.get("USERPROFILE")
-        default_path = os.path.join(user_profile, "Google Drive", "My Drive", "SMILE_Backup")
+        default_path = os.path.join(user_profile, "Google Drive", "My Drive", "SMILE BACKUP")
         if os.path.exists(os.path.dirname(default_path)):
             return default_path
             
