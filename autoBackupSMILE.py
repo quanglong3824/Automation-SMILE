@@ -16,10 +16,11 @@ CONFIG_FILE = "smile_config.json"
 
 # Cấu hình Google Drive (Tải cả thư mục bằng gdown)
 GD_FOLDER_URL = "https://drive.google.com/drive/folders/15dTWt2vgwOtFDLXrz9GU8vJ-7m9k9gkC?usp=sharing"
-DOWNLOAD_DEST_DIR = r"C:\SMILE_Setup" # Thư mục lưu các file tải về từ Drive
+DOWNLOAD_DEST_DIR = r"C:\SMILE_Setup"
 
-# Cấu hình Backup (Upload lên ổ mạng/Drive máy)
+# Cấu hình ĐƯỜNG DẪN REMOTE (Đưa file backup về từ đây)
 SOURCE_DIR = r"\\192.168.1.2\smile$"
+# Thư mục Google Drive trên máy để lưu trữ
 DRIVE_DIR = r"C:\Users\YourUser\Google Drive\SMILE_Backup" 
 # ================================================
 
@@ -31,18 +32,15 @@ class VisualPicker:
         self.root.attributes("-fullscreen", True)
         self.root.attributes("-topmost", True)
         self.root.config(cursor="cross")
-        
         self.label_text = f"HÃY CLICK VÀO NÚT: [{label.upper()}]"
         self.canvas = tk.Canvas(self.root, cursor="cross", bg="blue")
         self.canvas.pack(fill="both", expand=True)
-        
         self.text_id = self.canvas.create_text(
             self.root.winfo_screenwidth() // 2, 
             self.root.winfo_screenheight() // 2,
             text=self.label_text, font=("Arial", 30, "bold"), fill="white"
         )
         self.blink()
-        
         self.selected_coords = None
         self.canvas.bind("<Button-1>", self.on_click)
         self.root.mainloop()
@@ -75,43 +73,53 @@ class autoBackupSMILE:
             json.dump(self.config, f, indent=4)
 
     def download_folder_from_drive(self):
-        """Sử dụng gdown để tải toàn bộ thư mục từ Google Drive"""
         print(f"\n[Step 0] Đang đồng bộ thư mục từ Google Drive...")
         try:
-            # Đảm bảo thư mục đích tồn tại
             os.makedirs(DOWNLOAD_DEST_DIR, exist_ok=True)
-            
-            # Tải toàn bộ folder
             gdown.download_folder(url=GD_FOLDER_URL, output=DOWNLOAD_DEST_DIR, quiet=False, use_cookies=False)
-            print(f"   [+] Đã tải/cập nhật toàn bộ thư mục vào: {DOWNLOAD_DEST_DIR}")
+            print(f"   [+] Đã tải/cập nhật dữ liệu từ Drive vào: {DOWNLOAD_DEST_DIR}")
             return True
         except Exception as e:
-            print(f"   [!] Lỗi khi tải thư mục từ Drive: {e}")
+            print(f"   [!] Lỗi khi tải Drive: {e}")
             return False
 
     def sync_to_drive(self):
-        """Tìm file mới nhất từ ổ mạng và copy sang Google Drive máy"""
-        print(f"\n[Step 7] Đang quét file mới nhất tại {SOURCE_DIR}...")
+        """Quét file backup mới nhất từ 192.168.1.2/smile$ và đưa về Drive"""
+        print(f"\n[Step 7] Đang quét file backup mới nhất tại: {SOURCE_DIR}")
         try:
+            # Kiểm tra truy cập ổ mạng
+            if not os.path.exists(SOURCE_DIR):
+                print(f"   [!] LỖI: Không thể truy cập ổ mạng {SOURCE_DIR}. Vui lòng kiểm tra kết nối hoặc phân quyền.")
+                return
+
+            # Lọc lấy các file
             files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
-            if not files: return
+            if not files:
+                print("   [-] Thư mục trống, không có file để đưa về.")
+                return
+
+            # Tìm file mới nhất
             latest_file = max(files, key=os.path.getmtime)
             file_name = os.path.basename(latest_file)
-            
+            print(f"   [+] Đã phát hiện file backup mới nhất: {file_name}")
+
+            # Copy sang Drive
             os.makedirs(DRIVE_DIR, exist_ok=True)
-            shutil.copy2(latest_file, os.path.join(DRIVE_DIR, file_name))
-            print(f"   [OK] Đã đẩy file backup {file_name} lên Drive!")
+            dest_path = os.path.join(DRIVE_DIR, file_name)
+            print(f"   --> Đang đưa file về Drive...")
+            shutil.copy2(latest_file, dest_path)
+            print(f"   [OK] Đã đưa file về Drive thành công!")
         except Exception as e:
-            print(f"   [!] Lỗi đồng bộ: {e}")
+            print(f"   [!] Lỗi khi đồng bộ file: {e}")
 
     def run(self):
         try:
-            # BƯỚC 0: Tải/Cập nhật dữ liệu từ Drive trước khi làm việc
+            # Step 0: Tải dữ liệu từ Drive
             self.download_folder_from_drive() 
 
-            print(f"--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
+            print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
             
-            # Step 1: Mở app & Login
+            # Step 1: Khởi động SMILE
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
             dlg = self.app.window(title_re=".*Log.*In.*")
@@ -153,11 +161,11 @@ class autoBackupSMILE:
             send_keys("{ENTER}")
             
             # Step 6: Đợi 3 phút và đóng app
-            print("\n[Step 6] Chờ 3 phút để hoàn tất sao lưu...")
+            print("\n[Step 6] Chờ 3 phút để hệ thống hoàn tất sao lưu...")
             time.sleep(180)
             if self.app: self.app.kill()
 
-            # Step 7: Đồng bộ lên Drive máy
+            # Step 7: Đưa file backup về Drive
             self.sync_to_drive()
             
             print(f"\n[+] HOÀN TẤT TOÀN BỘ CÔNG VIỆC: {datetime.datetime.now()}")
