@@ -117,7 +117,7 @@ class autoBackupSMILE:
                 except: pass
                 time.sleep(1)
 
-            # BƯỚC 5: Backup Database & Enter (BƯỚC CUỐI)
+            # BƯỚC 5: Backup Database & Enter
             if not self.config.get("backup_db"):
                 self.config["backup_db"] = self.get_user_click_visual("Backup Database")
                 self.save_config()
@@ -125,10 +125,21 @@ class autoBackupSMILE:
             print("Step 5: Click 'Backup Database' và nhấn ENTER...")
             x, y = self.config["backup_db"]
             mouse.click(button='left', coords=(x, y))
-            time.sleep(2) # Chờ 2 giây để bảng hội thoại hiện ra (nếu có)
-            send_keys("{ENTER}") # Nhấn Enter để bắt đầu/xác nhận
+            time.sleep(2)
+            send_keys("{ENTER}")
             
-            print("\n[+] ĐÃ GỬI LỆNH BACKUP THÀNH CÔNG! QUY TRÌNH HOÀN TẤT.")
+            # BƯỚC 6: Đóng ứng dụng sau 3 phút
+            print("\n[Step 6] ĐANG CHẠY SAO LƯU... Sẽ tự động đóng SMILE sau 3 phút.")
+            for i in range(180, 0, -1):
+                if i % 30 == 0: # Thông báo mỗi 30 giây
+                    print(f"--> Còn lại {i} giây...")
+                time.sleep(1)
+            
+            print("--> Hết thời gian chờ. Đang đóng SMILE...")
+            if self.app:
+                self.app.kill()
+            
+            print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
 
         except Exception as e:
             print(f"!! Lỗi hệ thống: {e}")
