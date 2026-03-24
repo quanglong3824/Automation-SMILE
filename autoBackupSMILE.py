@@ -4,7 +4,6 @@ import os
 import shutil
 import datetime
 import tkinter as tk
-import gdown
 from pywinauto import Application, mouse
 from pywinauto.keyboard import send_keys
 
@@ -176,14 +175,6 @@ class autoBackupSMILE:
 
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
             input("\nNhấn ENTER để đóng cửa sổ...")
-
-        except Exception as e:
-            print(f"!! Lỗi: {e}")
-            input("\nNhấn ENTER để thoát...")
-
-if __name__ == "__main__":
-    bot = autoBackupSMILE()
-    bot.run()
 
         except Exception as e:
             print(f"!! Lỗi: {e}")
