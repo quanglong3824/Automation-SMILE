@@ -20,7 +20,7 @@ DOWNLOAD_DEST_DIR = r"C:\SMILE_Setup"
 
 # ĐƯỜNG DẪN Ổ MẠNG SMILE (Remote)
 SOURCE_DIR = r"\\192.168.1.2\smile$"
-# ĐƯỜNG DẪN THƯ MỤC DRIVE TRÊN MÁY BẠN (Để đẩy file lên)
+# ĐƯỜNG DẪN THƯ MỤC DRIVE TRÊN MÁY BẠN
 DRIVE_DIR = r"C:\Users\YourUser\Google Drive\SMILE_Backup"
 # ================================================
 
@@ -56,16 +56,16 @@ class autoBackupSMILE:
         self.app = None
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f: self.config = json.load(f)
-        else: self.config = {"more_options": None, "backup_db": None, "ok_btn": None}
+        else: self.config = {"more_options": None, "backup_db": None, "ok_btn": None, "backup_duration": 60}
 
     def copy_with_progress(self, src, dst):
         """Sao chép file kèm hiển thị tiến trình %"""
         total_size = os.path.getsize(src)
         copied = 0
         with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-            print(f"   --> Bắt đầu đẩy file: {os.path.basename(src)} ({total_size / (1024*1024):.2f} MB)")
+            print(f"   --> Đang đẩy file: {os.path.basename(src)} ({total_size / (1024*1024):.2f} MB)")
             while True:
-                chunk = fsrc.read(1024 * 1024) # 1MB mỗi lần
+                chunk = fsrc.read(1024 * 1024)
                 if not chunk: break
                 fdst.write(chunk)
                 copied += len(chunk)
@@ -75,66 +75,73 @@ class autoBackupSMILE:
 
     def run(self):
         try:
-            # STEP 0: Tải dữ liệu từ Google Drive bằng gdown
+            # STEP 0: Đồng bộ Drive
             print("\n[Step 0] Đang đồng bộ dữ liệu từ Link Drive Share...")
             os.makedirs(DOWNLOAD_DEST_DIR, exist_ok=True)
-            gdown.download_folder(url=GD_FOLDER_URL, output=DOWNLOAD_DEST_DIR, quiet=False)
+            gdown.download_folder(url=GD_FOLDER_URL, output=DOWNLOAD_DEST_DIR, quiet=True)
 
-            # STEP 0.5: Kiểm tra Remote
-            print(f"\n[Step 0.5] Kiểm tra ổ mạng: {SOURCE_DIR}")
-            if not os.path.exists(SOURCE_DIR):
-                print(f"   [!] Cảnh báo: Không truy cập được ổ mạng. Hãy mở File Explorer trước.")
-            else: print("   [OK] Kết nối remote sẵn sàng.")
-
-            # STEP 1-5: SMILE Automation
-            print(f"\n--- BẮT ĐẦU CHẠY SMILE: {datetime.datetime.now()} ---")
+            # STEP 1-2: Mở app & Login 1
+            print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
-            
-            # Đăng nhập 1
             dlg = self.app.window(title_re=".*Log.*In.*")
             if dlg.exists():
                 dlg.set_focus()
                 send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
                 time.sleep(15)
-            
-            send_keys("{ESC}") # Xóa Popup
+            send_keys("{ESC}")
             time.sleep(3)
 
-            # Bước 3: Chỉ điểm More Options
+            # Bước 3: More Options
             if not self.config.get("more_options"):
+                print("[!] Đang cài đặt tọa độ More Options...")
                 self.config["more_options"] = VisualPicker("More Options").selected_coords
                 with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
             mouse.click(button='left', coords=tuple(self.config["more_options"]))
             time.sleep(3)
 
-            # Step 4: Login 2 (Chỉ nhập Pass)
+            # Step 4: Login 2
             top = self.app.top_window()
             if any(w in top.window_text() for w in ["Log", "Pass", "Mật khẩu"]):
                 top.set_focus()
                 send_keys(PASS + "{ENTER}")
                 time.sleep(5)
 
-            # Bước 5: Chỉ điểm Backup Database
+            # Bước 5: Backup Database
             if not self.config.get("backup_db"):
+                print("[!] Đang cài đặt tọa độ Backup Database...")
                 self.config["backup_db"] = VisualPicker("Backup Database").selected_coords
                 with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
+            
+            # Bắt đầu tính giờ Backup
+            start_backup_time = time.time()
             mouse.click(button='left', coords=tuple(self.config["backup_db"]))
             time.sleep(2)
             send_keys("{ENTER}")
 
-            # STEP 6: Chỉ điểm OK (Xác nhận hoàn tất sao lưu)
-            print("\n[Step 6] Đang đợi bạn xác nhận bảng thông báo sao lưu hoàn tất (OK)...")
+            # STEP 6: Xử lý nút OK và Thời gian chờ
             if not self.config.get("ok_btn"):
+                print("\n[CHẾ ĐỘ CÀI ĐẶT] Đang đo thời gian backup và lấy tọa độ nút OK...")
                 self.config["ok_btn"] = VisualPicker("Nút OK Khi Xong").selected_coords
+                # Tính toán thời gian thực tế đã chờ
+                duration = int(time.time() - start_backup_time)
+                self.config["backup_duration"] = duration
                 with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
+                print(f"   [+] Đã học xong thời gian backup: {duration} giây.")
+            else:
+                # CHẾ ĐỘ TỰ ĐỘNG: Đợi thời gian đã học + 30 giây an toàn
+                wait_time = self.config.get("backup_duration", 60) + 30
+                print(f"\n[Step 6] TỰ ĐỘNG: Đang đợi backup hoàn tất (Cần chờ {wait_time} giây)...")
+                for i in range(wait_time, 0, -1):
+                    if i % 30 == 0: print(f"   --> Còn {i} giây...")
+                    time.sleep(1)
             
-            # Click vào nút OK để đóng bảng thông báo SMILE
+            # Click nút OK hoàn tất trên SMILE
             mouse.click(button='left', coords=tuple(self.config["ok_btn"]))
             time.sleep(2)
 
-            # Thoát lịch sự
-            print("--> Đang gửi lệnh thoát lịch sự (Phím 0)...")
+            # Thoát SMILE lịch sự
+            print("--> Đang thoát SMILE (Phím 0)...")
             try:
                 main_win = self.app.top_window()
                 main_win.set_focus()
@@ -142,17 +149,19 @@ class autoBackupSMILE:
                 time.sleep(3)
             except: pass
 
-            # STEP 7: Đẩy thẳng lên Drive với tiến trình
-            print("\n[Step 7] Đẩy file backup mới nhất lên Drive...")
-            files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
-            if files:
-                latest = max(files, key=os.path.getmtime)
-                os.makedirs(DRIVE_DIR, exist_ok=True)
-                self.copy_with_progress(latest, os.path.join(DRIVE_DIR, os.path.basename(latest)))
-            else: print("   [!] Không tìm thấy file backup nào trên ổ mạng.")
+            # STEP 7: Đẩy lên Drive
+            print("\n[Step 7] Đang đồng bộ file backup mới nhất lên Drive...")
+            if os.path.exists(SOURCE_DIR):
+                files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
+                if files:
+                    latest = max(files, key=os.path.getmtime)
+                    os.makedirs(DRIVE_DIR, exist_ok=True)
+                    self.copy_with_progress(latest, os.path.join(DRIVE_DIR, os.path.basename(latest)))
+                else: print("   [!] Không thấy file backup.")
+            else: print(f"   [!] Không thể truy cập {SOURCE_DIR}")
 
-            print(f"\n[+] TẤT CẢ ĐÃ XONG: {datetime.datetime.now()}")
-            input("\nNhấn phím ENTER để đóng cửa sổ...")
+            print(f"\n[+] HOÀN TẤT QUY TRÌNH: {datetime.datetime.now()}")
+            input("\nNhấn phím ENTER để đóng...")
 
         except Exception as e:
             print(f"!! Lỗi: {e}")
