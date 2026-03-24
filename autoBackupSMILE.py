@@ -35,13 +35,44 @@ def run_backup():
         time.sleep(5)
         
         # 2. Đăng nhập (Màn hình Login)
-        dlg_login = app.window(title_re=".*Log.*In.*")
-        if dlg_login.exists():
-            dlg_login.set_focus()
-            # Login Name 'IT' đã có sẵn, chỉ cần Tab sang Pass
-            dlg_login.type_keys("{TAB}" + PASS + "{ENTER}")
-            print("--> Đã gửi lệnh Đăng nhập. Đợi 15s...")
-            time.sleep(15)
+        print("--> Đang tìm và chờ form Màn hình Đăng nhập (Log In)...")
+        login_found = False
+        start_login_wait = time.time()
+        
+        while time.time() - start_login_wait < 30: # Chờ tối đa 30s
+            try:
+                top_login = app.top_window()
+                win_text = top_login.window_text()
+                
+                # Quét text của cửa sổ hiện tại xem có phải là form Login không
+                if "Log" in win_text or "In" in win_text or "Password" in win_text or "User" in win_text:
+                    login_found = True
+                    print(f"--> Đã tìm thấy form Đăng nhập (Window: '{win_text}')!")
+                    top_login.set_focus()
+                    
+                    # Login Name 'IT' đã có sẵn, chỉ cần Tab sang Pass
+                    print("--> Nhập mật khẩu...")
+                    top_login.type_keys("{TAB}" + PASS)
+                    
+                    # Dùng quét text để tìm và click nút 'Log In' hoặc 'OK' trên form đăng nhập
+                    if not find_and_click_text(top_login, "OK") and not find_and_click_text(top_login, "Log In"):
+                        print("!! Không quét được text nút Đăng nhập, gửi phím ENTER dự phòng.")
+                        top_login.type_keys("{ENTER}")
+                    
+                    print("--> Đã Gửi lệnh Đăng nhập thành công. Đợi 15s...")
+                    time.sleep(15)
+                    break
+            except:
+                pass
+            time.sleep(2)
+            
+        if not login_found:
+            print("!! Không tìm thấy form đăng nhập sau 30s. Tiếp tục chạy dự phòng...")
+            try:
+                app.top_window().type_keys("{TAB}" + PASS + "{ENTER}")
+                time.sleep(15)
+            except:
+                pass
 
         # 3. Xử lý bảng Sinh nhật
         top_win = app.top_window()
