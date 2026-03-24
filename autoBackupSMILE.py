@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import datetime
+import subprocess
 import tkinter as tk
 import gdown
 from pywinauto import Application, mouse
@@ -14,14 +15,13 @@ USER = "IT"
 PASS = "123@123a"
 CONFIG_FILE = "smile_config.json"
 
-# Cấu hình Google Drive (Tải cả thư mục bằng gdown)
-GD_FOLDER_URL = "https://drive.google.com/drive/folders/15dTWt2vgwOtFDLXrz9GU8vJ-7m9k9gkC?usp=sharing"
-DOWNLOAD_DEST_DIR = r"C:\SMILE_Setup"
+# Cấu hình ổ mạng (Nếu cần User/Pass để vào ổ mạng, hãy điền ở đây)
+REMOTE_PATH = r"\\192.168.1.2\smile$"
+REMOTE_USER = "" # Ví dụ: "administrator" (để trống nếu không cần)
+REMOTE_PASS = "" # Ví dụ: "password123" (để trống nếu không cần)
 
-# Cấu hình ĐƯỜNG DẪN REMOTE (Kéo từ đây)
-SOURCE_DIR = r"\\192.168.1.2\smile$"
-# Thư mục Google Drive trên máy (Đẩy thẳng vào đây để Sync lên Cloud)
-DRIVE_DIR = r"G:\My Drive\SMILE_Backup" # Thay bằng đường dẫn Drive thực tế của bạn
+# Thư mục Google Drive trên máy (Thường là đường dẫn đồng bộ của Drive Desktop)
+DRIVE_DIR = r"C:\Users\YourUser\Google Drive\SMILE_Backup"
 # ================================================
 
 class VisualPicker:
@@ -72,64 +72,57 @@ class autoBackupSMILE:
         with open(CONFIG_FILE, 'w') as f:
             json.dump(self.config, f, indent=4)
 
-    def download_folder_from_drive(self):
-        print(f"\n[Step 0] Đang đồng bộ thư mục từ Google Drive...")
+    def connect_network_drive(self):
+        """Tự động kết nối tới ổ mạng nếu chưa có kết nối"""
+        print(f"\n[Step 0.5] Đang kiểm tra kết nối tới ổ mạng {REMOTE_PATH}...")
         try:
-            os.makedirs(DOWNLOAD_DEST_DIR, exist_ok=True)
-            gdown.download_folder(url=GD_FOLDER_URL, output=DOWNLOAD_DEST_DIR, quiet=False, use_cookies=False)
-            print(f"   [+] Đã tải/cập nhật dữ liệu từ Drive vào: {DOWNLOAD_DEST_DIR}")
-            return True
-        except Exception as e:
-            print(f"   [!] Lỗi khi tải Drive: {e}")
-            return False
-
-    def pre_check_remote(self):
-        """Kích hoạt kết nối tới ổ mạng remote"""
-        print(f"\n[Step 0.5] Đang kích hoạt kết nối tới ổ remote: {SOURCE_DIR}...")
-        try:
-            if os.path.exists(SOURCE_DIR):
-                print(f"   [OK] Đã sẵn sàng kết nối remote.")
+            if os.path.exists(REMOTE_PATH):
+                print("   [OK] Ổ mạng đã sẵn sàng.")
+                return True
+            
+            print("   [-] Không thấy ổ mạng, đang thử lệnh 'net use' để kết nối...")
+            cmd = f'net use "{REMOTE_PATH}"'
+            if REMOTE_USER and REMOTE_PASS:
+                cmd += f' /user:{REMOTE_USER} {REMOTE_PASS}'
+            
+            subprocess.run(cmd, shell=True, capture_output=True)
+            time.sleep(2)
+            
+            if os.path.exists(REMOTE_PATH):
+                print("   [OK] Đã kết nối thành công tới ổ mạng.")
                 return True
             else:
-                print(f"   [!] CẢNH BÁO: Không thấy ổ mạng. Hãy chắc chắn đã đăng nhập ổ {SOURCE_DIR}.")
+                print(f"   [!] LỖI: Không thể kết nối tới {REMOTE_PATH}. Vui lòng Map Drive thủ công.")
                 return False
-        except: return False
+        except Exception as e:
+            print(f"   [!] Lỗi khi kết nối ổ mạng: {e}")
+            return False
 
-    def push_directly_to_drive(self):
-        """Kéo file mới nhất từ remote và đẩy THẲNG lên Google Drive"""
-        print(f"\n[Step 7] Đang kéo file mới nhất từ remote sang Drive...")
+    def push_to_drive(self):
+        """Kéo file từ ổ mạng và đẩy lên Drive"""
+        print(f"\n[Step 7] Đang đồng bộ file backup lên Drive...")
         try:
-            if not os.path.exists(SOURCE_DIR):
-                print(f"   [!] LỖI: Remote {SOURCE_DIR} không khả dụng.")
+            if not os.path.exists(REMOTE_PATH):
+                print(f"   [!] Lỗi: Không tìm thấy ổ mạng {REMOTE_PATH}.")
                 return
 
-            # Tìm file mới nhất tại remote
-            files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
-            if not files:
-                print("   [-] Không tìm thấy file backup nào tại remote.")
-                return
-
+            files = [os.path.join(REMOTE_PATH, f) for f in os.listdir(REMOTE_PATH) if os.path.isfile(os.path.join(REMOTE_PATH, f))]
+            if not files: return
             latest_file = max(files, key=os.path.getmtime)
             file_name = os.path.basename(latest_file)
-            print(f"   [+] Phát hiện file: {file_name}")
 
-            # Đẩy thẳng vào thư mục Drive
             os.makedirs(DRIVE_DIR, exist_ok=True)
-            dest_path = os.path.join(DRIVE_DIR, file_name)
-            
-            print(f"   --> Đang đẩy THẲNG lên Drive link...")
-            shutil.copy2(latest_file, dest_path)
-            print(f"   [OK] Đã hoàn tất đẩy file lên Drive!")
+            shutil.copy2(latest_file, os.path.join(DRIVE_DIR, file_name))
+            print(f"   [OK] Đã đẩy file {file_name} lên Drive!")
         except Exception as e:
-            print(f"   [!] Lỗi khi luân chuyển file: {e}")
+            print(f"   [!] Lỗi đồng bộ: {e}")
 
     def run(self):
         try:
-            # Step 0: Đồng bộ dữ liệu đầu vào
-            self.download_folder_from_drive() 
-            self.pre_check_remote()
+            # Step 0.5: Kết nối mạng trước
+            self.connect_network_drive()
 
-            print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
+            print(f"\n--- BẮT ĐẦU: {datetime.datetime.now()} ---")
             
             # Step 1: Mở SMILE
             self.app = Application(backend="win32").start(SMILE_PATH)
@@ -140,31 +133,25 @@ class autoBackupSMILE:
                 send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
                 time.sleep(15)
 
-            # Step 2: Xóa Popup
+            # Step 2: Popup
             send_keys("{ESC}")
             time.sleep(3)
 
-            # Step 3: More Options (Chỉ điểm/Click)
+            # Step 3: More Options
             if not self.config.get("more_options"):
                 self.config["more_options"] = VisualPicker("More Options").selected_coords
                 self.save_config()
             mouse.click(button='left', coords=tuple(self.config["more_options"]))
             time.sleep(3)
 
-            # Step 4: Login 2 (Auto)
-            auth_wait_start = time.time()
-            while time.time() - auth_wait_start < 10:
-                try:
-                    top_win = self.app.top_window()
-                    if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
-                        top_win.set_focus()
-                        send_keys(PASS + "{ENTER}")
-                        time.sleep(5)
-                        break
-                except: pass
-                time.sleep(1)
+            # Step 4: Login 2
+            top_win = self.app.top_window()
+            if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
+                top_win.set_focus()
+                send_keys(PASS + "{ENTER}")
+                time.sleep(5)
 
-            # Step 5: Backup & Enter
+            # Step 5: Backup
             if not self.config.get("backup_db"):
                 self.config["backup_db"] = VisualPicker("Backup Database").selected_coords
                 self.save_config()
@@ -172,13 +159,13 @@ class autoBackupSMILE:
             time.sleep(2)
             send_keys("{ENTER}")
             
-            # Step 6: Chờ 2 phút và đóng app
-            print("\n[Step 6] Chờ 2 phút để hoàn tất sao lưu...")
+            # Step 6: Chờ 2 phút
+            print("\n[Step 6] Chờ 2 phút để hoàn tất...")
             time.sleep(120)
             if self.app: self.app.kill()
 
-            # Step 7: Kéo từ remote Đẩy thẳng lên Drive
-            self.push_directly_to_drive()
+            # Step 7: Sync Drive
+            self.push_to_drive()
             
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
 
