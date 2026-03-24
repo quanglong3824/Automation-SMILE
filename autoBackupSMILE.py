@@ -1,118 +1,102 @@
 import time
-import json
-import os
-from pywinauto import Application, mouse
+import datetime
+from pywinauto import Application
 from pywinauto.keyboard import send_keys
-import keyboard
 
 # ==================== CONFIG ====================
 SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
-ACTION_FILE = "smile_actions.json"
+USER = "IT"
+PASS = "123@123a"
 # ================================================
 
-class autoBackupSMILE:
-    def __init__(self):
-        self.actions = []
-
-    def save_actions(self):
-        with open(ACTION_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.actions, f, ensure_ascii=False, indent=4)
-        print(f"\n[+] Đã lưu kịch bản vào {ACTION_FILE}")
-
-    def load_actions(self):
-        if os.path.exists(ACTION_FILE):
-            with open(ACTION_FILE, 'r', encoding='utf-8') as f:
-                self.actions = json.load(f)
-            return True
+def deep_scan_and_click(window, target_text):
+    """Quét cực sâu toàn bộ các thành phần để tìm chữ và CLICK"""
+    print(f"--> Đang quét tìm chữ: '{target_text}'...")
+    try:
+        # Lấy tất cả các thành phần (kể cả những thành phần bị ẩn hoặc lồng sâu)
+        elements = window.descendants()
+        for el in elements:
+            try:
+                content = el.window_text()
+                # Nếu thấy chữ cần tìm trong text của thành phần đó
+                if content and target_text.lower() in content.lower():
+                    print(f"   [+] ĐÃ THẤY '{content}'! Đang click chuột...")
+                    # Đưa chuột đến và click (dùng click_input để giả lập chuột thật)
+                    el.click_input()
+                    return True
+            except:
+                continue
+        return False
+    except Exception as e:
+        print(f"   [!] Lỗi khi quét: {e}")
         return False
 
-    def record_mode(self):
-        """Màn hình SMILE nên được mở sẵn ở bước Đăng nhập trước khi bắt đầu"""
-        print("\n=== CHẾ ĐỘ GHI HÀNH ĐỘNG (RECORD MODE) ===")
-        print("Hướng dẫn:")
-        print("1. Di chuyển chuột đến vị trí cần bấm -> Nhấn 'S' để lưu Click.")
-        print("2. Cần nhập văn bản (User/Pass) -> Nhấn 'K', sau đó nhập nội dung vào Console.")
-        print("3. Cần chờ (sau khi bấm Login/Backup) -> Nhấn 'D', nhập số giây cần đợi (VD: 15).")
-        print("4. Nhấn 'E' để Kết thúc và Lưu.")
-        print("-" * 30)
+def autoBackupSMILE():
+    try:
+        print(f"--- BẮT ĐẦU QUY TRÌNH (BẢN QUÉT TEXT): {datetime.datetime.now()} ---")
         
-        self.actions = []
-        while True:
-            if keyboard.is_pressed('s'):
-                pos = mouse.position()
-                self.actions.append({"type": "click", "pos": [pos[0], pos[1]]})
-                print(f"  [+] Đã ghi Click tại: {pos}")
-                time.sleep(0.5)
+        # 1. Khởi động
+        print("Bước 1: Khởi động SMILE...")
+        app = Application(backend="win32").start(SMILE_PATH)
+        time.sleep(10)
 
-            elif keyboard.is_pressed('k'):
-                key = input("  > Nhập nội dung (VD: IT, {TAB}, 123@123a, {ENTER}): ")
-                self.actions.append({"type": "key", "value": key})
-                print(f"  [+] Đã ghi phím: {key}")
-                time.sleep(0.5)
+        # 2. Đăng nhập lần 1
+        dlg = app.window(title_re=".*Log.*In.*")
+        if dlg.exists():
+            print("--> Đang đăng nhập lần 1...")
+            dlg.set_focus()
+            send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
+            time.sleep(15)
 
-            elif keyboard.is_pressed('d'):
-                sec = input("  > Nhập số giây cần chờ tại bước này (VD: 10): ")
-                self.actions.append({"type": "wait", "value": int(sec)})
-                print(f"  [+] Đã ghi lệnh chờ: {sec} giây")
-                time.sleep(0.5)
+        # 3. Quét và Đóng Popup Sinh nhật/Thông báo
+        print("Bước 2: Dọn dẹp Popup...")
+        top_win = app.top_window()
+        # Tìm bất kỳ nút nào có chữ Đóng, Close, Thoát để click
+        if not deep_scan_and_click(top_win, "Close"):
+            deep_scan_and_click(top_win, "Đóng")
+            # Nếu vẫn không thấy, nhấn ESC dự phòng
+            send_keys("{ESC}")
+        time.sleep(3)
 
-            elif keyboard.is_pressed('e'):
-                self.save_actions()
+        # 4. Bước then chốt: Quét tìm "More Options"
+        print("Bước 3: Truy tìm 'More Options' trên toàn màn hình...")
+        main_win = app.top_window() # Lấy cửa sổ đang hiện hữu
+        if not deep_scan_and_click(main_win, "More Options"):
+            print("   [-] Không thấy chữ 'More Options', thử quét phím '0'...")
+            if not deep_scan_and_click(main_win, "0"):
+                # Nếu quét không ra, gửi phím 0 mù
+                send_keys("0")
+        
+        time.sleep(5)
+
+        # 5. Đăng nhập lần 2 (Nếu có bảng hiện ra)
+        print("Bước 4: Xác thực lần 2...")
+        auth_dlg = app.top_window()
+        if "Log" in auth_dlg.window_text() or "Pass" in auth_dlg.window_text():
+            auth_dlg.set_focus()
+            send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
+            time.sleep(5)
+
+        # 6. Quét tìm "Backup Database"
+        print("Bước 5: Chạy Backup...")
+        options_win = app.top_window()
+        if not deep_scan_and_click(options_win, "Backup Database"):
+            send_keys("a") # Phím tắt dự phòng
+        
+        # 7. Đợi bảng OK hoàn tất
+        print("--> ĐANG CHẠY BACKUP... Đợi hiện nút OK (1-2 phút)...")
+        start_wait = time.time()
+        while time.time() - start_wait < 600:
+            final_popup = app.top_window()
+            if deep_scan_and_click(final_popup, "OK") or deep_scan_and_click(final_popup, "Đồng ý"):
+                print("--> THÀNH CÔNG! Đã hoàn tất sao lưu.")
                 break
-            time.sleep(0.01)
+            time.sleep(5)
 
-    def play_mode(self):
-        if not self.load_actions():
-            print("\n[!] Lỗi: Chưa có kịch bản. Hãy chọn mục 1.")
-            return
+        print("--- KẾT THÚC ---")
 
-        print("\n--> Đang khởi động SMILE...")
-        try:
-            # Tự động mở App trước khi chạy kịch bản
-            Application(backend="win32").start(SMILE_PATH)
-            print("--> Chờ 10 giây cho App khởi động...")
-            time.sleep(10)
-
-            print(f"=== ĐANG CHẠY TỰ ĐỘNG ({len(self.actions)} bước) ===")
-            for i, action in enumerate(self.actions):
-                if action["type"] == "click":
-                    x, y = action["pos"]
-                    print(f"  [{i+1}] Click tại ({x}, {y})")
-                    mouse.click(button='left', coords=(x, y))
-                    time.sleep(1)
-                
-                elif action["type"] == "key":
-                    print(f"  [{i+1}] Gửi phím: {action['value']}")
-                    send_keys(action["value"])
-                    time.sleep(1)
-
-                elif action["type"] == "wait":
-                    print(f"  [{i+1}] Chờ trong {action['value']} giây...")
-                    time.sleep(action["value"])
-            
-            print("\n[+] HOÀN TẤT.")
-        except Exception as e:
-            print(f"\n[!] Lỗi: {e}")
-
-def main_menu():
-    bot = autoBackupSMILE()
-    while True:
-        print("\n" + "="*30)
-        print("   autoBackupSMILE v2 (Recorder)")
-        print("="*30)
-        print("1. Ghi hành động mới (Record)")
-        print("   (Mở sẵn SMILE ở màn hình Login trước khi chọn)")
-        print("2. Chạy tự động (Auto Play)")
-        print("0. Thoát")
-        print("-" * 30)
-        
-        choice = input("Chọn (0-2): ")
-        if choice == '1':
-            bot.record_mode()
-        elif choice == '2':
-            bot.play_mode()
-        elif choice == '0':
-            break
+    except Exception as e:
+        print(f"!! Lỗi: {e}")
 
 if __name__ == "__main__":
-    main_menu()
+    autoBackupSMILE()
