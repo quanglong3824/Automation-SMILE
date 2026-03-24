@@ -74,20 +74,55 @@ class autoBackupSMILE:
         return None
 
     def copy_with_progress(self, src, dst):
-        """Sao chép file kèm hiển thị tiến trình %"""
-        total_size = os.path.getsize(src)
-        copied = 0
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-            print(f"   --> Đang đẩy file: {os.path.basename(src)} ({total_size / (1024*1024):.2f} MB)")
-            while True:
-                chunk = fsrc.read(1024 * 1024)
-                if not chunk: break
-                fdst.write(chunk)
-                copied += len(chunk)
-                percent = (copied / total_size) * 100
-                print(f"\r   [Đang tải lên Drive]: {percent:.1f}% [{'#' * int(percent // 5)}{'-' * (20 - int(percent // 5))}]", end="")
-        print(f"\n   [OK] Đã hoàn tất đẩy file lên Drive.")
+        """Sao chép file kèm hiển thị tiến trình % và xử lý lỗi Permission"""
+        MAX_RETRIES = 3
+        RETRY_DELAY = 5
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                total_size = os.path.getsize(src)
+                copied = 0
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                
+                # Kiểm tra nếu file đích đã tồn tại và đang bị khóa (thường do Drive đang sync)
+                if os.path.exists(dst):
+                    try:
+                        with open(dst, 'ab') as f: pass
+                    except PermissionError:
+                        print(f"   [!] File đích đang bị khóa bởi ứng dụng khác (Drive sync?). Thử lại sau {RETRY_DELAY}s... ({attempt+1}/{MAX_RETRIES})")
+                        time.sleep(RETRY_DELAY)
+                        continue
+
+                with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
+                    print(f"   --> Đang đẩy file: {os.path.basename(src)} ({total_size / (1024*1024):.2f} MB)")
+                    while True:
+                        chunk = fsrc.read(1024 * 1024)
+                        if not chunk: break
+                        fdst.write(chunk)
+                        copied += len(chunk)
+                        percent = (copied / total_size) * 100
+                        print(f"\r   [Đang tải lên Drive]: {percent:.1f}% [{'#' * int(percent // 5)}{'-' * (20 - int(percent // 5))}]", end="")
+                print(f"\n   [OK] Đã hoàn tất đẩy file lên Drive.")
+                return True
+            except PermissionError as e:
+                if attempt < MAX_RETRIES - 1:
+                    print(f"\n   [!] Lỗi Permission (Error 13). Có thể file đang bị lock. Thử lại sau {RETRY_DELAY}s... ({attempt+1}/{MAX_RETRIES})")
+                    time.sleep(RETRY_DELAY)
+                else:
+                    print(f"\n   [x] Không thể ghi file sau {MAX_RETRIES} lần thử. Lỗi: {e}")
+                    # Thử phương thức copy thay thế của shutil như phương án cuối cùng
+                    try:
+                        print("   --> Thử dùng phương thức shutil.copy2...")
+                        shutil.copy2(src, dst)
+                        print("   [OK] Đã hoàn tất bằng shutil.copy2.")
+                        return True
+                    except Exception as e2:
+                        print(f"   [x] Thất bại hoàn toàn: {e2}")
+                        return False
+            except Exception as e:
+                print(f"\n   [x] Lỗi không xác định khi copy: {e}")
+                return False
+        return False
 
     def run(self):
         try:
