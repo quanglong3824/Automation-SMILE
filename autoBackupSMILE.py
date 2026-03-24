@@ -18,49 +18,45 @@ def get_main_window(app):
         all_wins = app.windows(title_re=".*SMILE.*")
         if not all_wins:
             return None
-        # Chọn cửa sổ có diện tích lớn nhất (thường là main win)
-        main_win = max(all_wins, key=lambda w: w.rectangle().width() * w.rectangle().height())
-        return main_win
+        return max(all_wins, key=lambda w: w.rectangle().width() * w.rectangle().height())
     except:
         return None
 
 def clear_birthday_popup(app):
-    """Đóng bảng Happy Birth Day hoặc các bảng thông báo chặn màn hình"""
-    print("--> Đang kiểm tra bảng chặn (Sinh nhật/Thông báo)...")
+    """Đóng các bảng popup chặn màn hình (Sinh nhật/Thông báo)"""
+    print("--> Đang kiểm tra và dọn dẹp popup...")
     try:
-        # Tìm các cửa sổ popup phổ biến
-        for title in [".*Happy.*Birth.*Day.*", ".*Notice.*", ".*Thông báo.*"]:
-            bd_win = app.window(title_re=title)
-            if bd_win.exists():
-                print(f"!!! PHÁT HIỆN BẢNG: {title}. Đang đóng...")
-                bd_win.set_focus()
-                # Thử tìm nút Close
-                try:
-                    btn_close = bd_win.child_window(title="Close", control_type="Button")
-                    if btn_close.exists():
-                        btn_close.click_input()
-                    else:
-                        bd_win.type_keys("{ESC}")
-                except:
-                    bd_win.type_keys("{ESC}")
-                time.sleep(2)
+        # Danh sách các tiêu đề popup phổ biến
+        popups = [".*Happy.*Birth.*Day.*", ".*Notice.*", ".*Thông báo.*", ".*Birthday.*"]
+        for title in popups:
+            try:
+                win = app.window(title_re=title)
+                if win.exists():
+                    print(f"!!! PHÁT HIỆN BẢNG: '{title}'. Đang đóng...")
+                    win.set_focus()
+                    win.type_keys("{ESC}") # Ưu tiên dùng ESC để đóng nhanh
+                    time.sleep(2)
+            except:
+                continue
     except Exception as e:
-        print(f"--> Lỗi khi đóng popup: {e}")
+        print(f"--> Lỗi dọn popup: {e}")
 
 def find_and_click_ok(app):
-    """Tìm và bấm nút OK trên các bảng popup thông báo thành công"""
+    """Tìm và bấm nút OK trên các bảng thông báo thành công"""
     try:
-        # Lấy cửa sổ trên cùng hiện tại
+        # Kiểm tra cửa sổ trên cùng hiện tại
         top_win = app.top_window()
+        # Thử tìm các nút có text là OK, Đồng ý, Yes, Close
         elements = top_win.descendants()
         for el in elements:
             txt = el.window_text()
-            # Tìm nút có chữ OK hoặc Đồng ý
-            if txt and any(ok_txt in txt.upper() for ok_txt in ["OK", "ĐỒNG Ý", "YES"]):
-                print(f"   [+] Đã tìm thấy nút '{txt}'. Đang Click...")
+            if txt and any(ok_txt in txt.upper() for ok_txt in ["OK", "ĐỒNG Ý", "YES", "CLOSE"]):
+                print(f"   [+] Tìm thấy nút '{txt}'. Đang Click hoàn tất...")
                 el.click_input()
                 return True
-        return False
+        # Nếu không tìm thấy nút, thử nhấn phím Enter/Esc trên cửa sổ đó
+        top_win.type_keys("{ENTER}")
+        return True
     except:
         return False
 
@@ -68,64 +64,80 @@ def autoBackupSMILE():
     try:
         print(f"--- BẮT ĐẦU QUY TRÌNH BACKUP SMILE: {datetime.datetime.now()} ---")
         
-        # BƯỚC 1: Khởi động/Kết nối và Đăng nhập
-        print("Step 1: Khởi động/Kết nối SMILE...")
+        # BƯỚC 1: Khởi động/Kết nối
+        print("Step 1: Khởi động SMILE...")
         try:
             app = Application(backend="win32").connect(path=SMILE_PATH)
         except:
             app = Application(backend="win32").start(SMILE_PATH)
         
-        time.sleep(10)
+        time.sleep(8)
         
+        # Đăng nhập
         dlg_login = app.window(title_re=".*Log.*In.*")
         if dlg_login.exists():
-            print("--> Đang thực hiện đăng nhập...")
+            print("--> Đang đăng nhập...")
             dlg_login.set_focus()
-            # Xóa trắng ô User và nhập lại cho chắc
-            dlg_login.type_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
+            send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
             time.sleep(15)
 
-        # BƯỚC 2: Xử lý popup Sinh nhật/Thông báo
-        print("Step 2: Kiểm tra và dọn dẹp popup...")
+        # BƯỚC 2: Dọn dẹp Popup
+        print("Step 2: Dọn dẹp màn hình...")
         clear_birthday_popup(app)
 
         # BƯỚC 3: Vào More Options (Phím 0)
-        print("Step 3: Đang vào 'More Options' (Nhấn phím 0)...")
+        print("Step 3: Đang vào 'More Options' (Phím 0)...")
         main_win = get_main_window(app)
         if main_win:
             main_win.set_focus()
-            main_win.type_keys("0") # Nhấn phím 0
-            time.sleep(5)
+            # Click nhẹ vào thanh tiêu đề hoặc giữa màn hình để đảm bảo focus thực sự
+            main_win.click_input(coords=(main_win.rectangle().width() // 2, 10))
+            time.sleep(1)
+            
+            # Thử cả 2 cách gửi phím để chắc chắn
+            print("--> Gửi phím '0'...")
+            send_keys("0") 
+            time.sleep(5) # Đợi menu More Options hiện ra
         else:
-            print("!! Lỗi: Không thấy cửa sổ chính để nhấn phím 0.")
+            print("!! Lỗi: Không thấy cửa sổ chính.")
             return
 
         # BƯỚC 4: Chạy Backup Database (Phím A)
-        print("Step 4: Đang chọn 'Backup Database' (Nhấn phím A)...")
-        # Sau khi bấm 0, thường sẽ hiện ra một menu hoặc cửa sổ mới
-        options_win = app.top_window()
-        options_win.set_focus()
-        options_win.type_keys("a") # Nhấn phím A
+        print("Step 4: Đang chọn 'Backup Database' (Phím A)...")
+        # Lấy cửa sổ mới nhất sau khi bấm 0
+        try:
+            options_win = app.top_window()
+            options_win.set_focus()
+            print(f"--> Đang thao tác trên cửa sổ: '{options_win.window_text()}'")
+            
+            print("--> Gửi phím 'A'...")
+            send_keys("a")
+            time.sleep(3)
+        except:
+            print("!! Không tìm thấy cửa sổ More Options để bấm phím A.")
+
+        # BƯỚC 5: Đợi hiện bảng OK (1-2 phút)
+        print("Step 5: ĐANG CHẠY BACKUP... Đợi hiện nút OK (tầm 1-2 phút)...")
+        start_time = time.time()
+        found = False
         
-        # BƯỚC 5: Đợi 1-2 phút và bấm OK kết thúc
-        print("Step 5: ĐANG CHẠY BACKUP... Đang đợi bảng thông báo thành công (1-2 phút)...")
-        start_wait = time.time()
-        
-        # Chờ tối đa 10 phút cho chắc chắn
-        while time.time() - start_wait < 600:
+        # Chờ tối đa 10 phút
+        while time.time() - start_time < 600:
             if find_and_click_ok(app):
-                print("--> THÀNH CÔNG! Đã bấm nút OK hoàn tất.")
+                print("--> THÀNH CÔNG: Đã xác nhận OK hoàn tất.")
+                found = True
                 break
             time.sleep(5)
-        
-        # Kết thúc
-        print("--- HOÀN TẤT QUY TRÌNH ---")
+            
+        if not found:
+            print("!! Quá thời gian chờ hoặc không thấy thông báo thành công.")
+
+        print("--- KẾT THÚC QUY TRÌNH ---")
         time.sleep(2)
-        # Tắt app sau khi xong (nếu cần)
-        # main_win.close() 
+        # main_win.close() # Mở comment nếu muốn tự động tắt app
 
     except Exception as e:
-        print(f"!! Lỗi hệ thống: {e}")
+        print(f"!! Lỗi: {e}")
 
 if __name__ == "__main__":
     autoBackupSMILE()
