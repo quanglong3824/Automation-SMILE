@@ -83,31 +83,40 @@ class autoBackupSMILE:
             print(f"   [!] Lỗi khi tải Drive: {e}")
             return False
 
+    def pre_check_remote(self):
+        """Mở và kiểm tra ổ mạng trước khi bắt đầu SMILE"""
+        print(f"\n[Step 0.5] Đang kiểm tra kết nối tới ổ mạng: {SOURCE_DIR}...")
+        try:
+            # Thử liệt kê file để kích hoạt kết nối
+            if os.path.exists(SOURCE_DIR):
+                print(f"   [OK] Đã kết nối tới ổ mạng thành công.")
+                return True
+            else:
+                print(f"   [!] CẢNH BÁO: Không thể truy cập {SOURCE_DIR}. Hãy đảm bảo ổ mạng đã được đăng nhập.")
+                return False
+        except Exception as e:
+            print(f"   [!] Lỗi kết nối ổ mạng: {e}")
+            return False
+
     def sync_to_drive(self):
         """Quét file backup mới nhất từ 192.168.1.2/smile$ và đưa về Drive"""
         print(f"\n[Step 7] Đang quét file backup mới nhất tại: {SOURCE_DIR}")
         try:
-            # Kiểm tra truy cập ổ mạng
             if not os.path.exists(SOURCE_DIR):
-                print(f"   [!] LỖI: Không thể truy cập ổ mạng {SOURCE_DIR}. Vui lòng kiểm tra kết nối hoặc phân quyền.")
+                print(f"   [!] LỖI: Không thể truy cập ổ mạng {SOURCE_DIR}.")
                 return
 
-            # Lọc lấy các file
             files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
             if not files:
-                print("   [-] Thư mục trống, không có file để đưa về.")
+                print("   [-] Không có file để đưa về.")
                 return
 
-            # Tìm file mới nhất
             latest_file = max(files, key=os.path.getmtime)
             file_name = os.path.basename(latest_file)
-            print(f"   [+] Đã phát hiện file backup mới nhất: {file_name}")
+            print(f"   [+] Đã phát hiện file mới nhất: {file_name}")
 
-            # Copy sang Drive
             os.makedirs(DRIVE_DIR, exist_ok=True)
-            dest_path = os.path.join(DRIVE_DIR, file_name)
-            print(f"   --> Đang đưa file về Drive...")
-            shutil.copy2(latest_file, dest_path)
+            shutil.copy2(latest_file, os.path.join(DRIVE_DIR, file_name))
             print(f"   [OK] Đã đưa file về Drive thành công!")
         except Exception as e:
             print(f"   [!] Lỗi khi đồng bộ file: {e}")
@@ -116,6 +125,9 @@ class autoBackupSMILE:
         try:
             # Step 0: Tải dữ liệu từ Drive
             self.download_folder_from_drive() 
+            
+            # Step 0.5: Mở file remote trước
+            self.pre_check_remote()
 
             print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
             
@@ -139,7 +151,7 @@ class autoBackupSMILE:
             mouse.click(button='left', coords=tuple(self.config["more_options"]))
             time.sleep(3)
 
-            # Step 4: Login 2 (Chỉ nhập Pass)
+            # Step 4: Login 2
             auth_wait_start = time.time()
             while time.time() - auth_wait_start < 10:
                 try:
@@ -160,9 +172,9 @@ class autoBackupSMILE:
             time.sleep(2)
             send_keys("{ENTER}")
             
-            # Step 6: Đợi 3 phút và đóng app
-            print("\n[Step 6] Chờ 3 phút để hệ thống hoàn tất sao lưu...")
-            time.sleep(180)
+            # Step 6: Đợi 2 phút (Đã rút ngắn)
+            print("\n[Step 6] Chờ 2 phút để hệ thống hoàn tất sao lưu...")
+            time.sleep(120)
             if self.app: self.app.kill()
 
             # Step 7: Đưa file backup về Drive
