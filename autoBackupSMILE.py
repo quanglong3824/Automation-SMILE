@@ -59,7 +59,7 @@ class autoBackupSMILE:
                 with open(CONFIG_FILE, 'r') as f:
                     return json.load(f)
             except: pass
-        return {"more_options": None, "backup_db": None, "ok_btn": None}
+        return {"more_options": None, "backup_db": None}
 
     def save_config(self):
         with open(CONFIG_FILE, 'w') as f:
@@ -102,18 +102,19 @@ class autoBackupSMILE:
             mouse.click(button='left', coords=(x, y))
             time.sleep(3)
 
-            # BƯỚC 4: Tự động Đăng nhập lần 2 (Nhập trực tiếp mật khẩu)
+            # BƯỚC 4: Tự động Đăng nhập lần 2
             print("Step 4: Đang tự động xác thực mật khẩu lần 2...")
             auth_wait_start = time.time()
             while time.time() - auth_wait_start < 10:
-                top_win = self.app.top_window()
-                if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
-                    print("   [+] Đã thấy bảng xác thực. Đang nhập mật khẩu...")
-                    top_win.set_focus()
-                    # Nhập trực tiếp mật khẩu và Enter (không dùng TAB)
-                    send_keys(PASS + "{ENTER}")
-                    time.sleep(5)
-                    break
+                try:
+                    top_win = self.app.top_window()
+                    if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
+                        print("   [+] Đã thấy bảng xác thực. Đang nhập mật khẩu...")
+                        top_win.set_focus()
+                        send_keys(PASS + "{ENTER}")
+                        time.sleep(5)
+                        break
+                except: pass
                 time.sleep(1)
 
             # BƯỚC 5: Backup Database (Chỉ điểm/Click)
@@ -125,17 +126,36 @@ class autoBackupSMILE:
             x, y = self.config["backup_db"]
             mouse.click(button='left', coords=(x, y))
             
-            # BƯỚC 6: Đợi nút OK
-            print("Step 6: Đang chờ Database xử lý (60s)...")
-            time.sleep(60) # Chờ backup chạy
+            # BƯỚC 6: Đợi nút OK (Tự động hoàn toàn)
+            print("Step 6: ĐANG CHẠY BACKUP... Đợi hiện thông báo thành công (OK)...")
+            # Database thường mất 1-2 phút, bot sẽ đợi tối đa 10 phút
+            start_wait = time.time()
+            found_ok = False
             
-            if not self.config.get("ok_btn"):
-                self.config["ok_btn"] = self.get_user_click_visual("Nút OK Hoàn tất")
-                self.save_config()
-            
-            print("--> Click OK để hoàn tất.")
-            x, y = self.config["ok_btn"]
-            mouse.click(button='left', coords=(x, y))
+            while time.time() - start_wait < 600:
+                try:
+                    # Kiểm tra cửa sổ trên cùng hiện tại
+                    top_win = self.app.top_window()
+                    # Quét xem có nút OK, Đồng ý, Yes, Close nào không
+                    elements = top_win.descendants()
+                    for el in elements:
+                        txt = el.window_text().upper()
+                        if any(ok_txt in txt for ok_txt in ["OK", "ĐỒNG Ý", "YES", "XÁC NHẬN", "SUCCESS"]):
+                            print(f"   [+] Đã thấy nút '{el.window_text()}'. Click hoàn tất!")
+                            el.click_input()
+                            found_ok = True
+                            break
+                    if found_ok: break
+                except: pass
+                
+                # Nếu chờ quá 1 phút rưỡi mà không thấy quét được text, thử nhấn Enter cầu may
+                if time.time() - start_wait > 90:
+                    print("   [-] Chờ hơi lâu, thử nhấn phím ENTER dự phòng...")
+                    send_keys("{ENTER}")
+                    found_ok = True
+                    break
+                    
+                time.sleep(5) # Kiểm tra lại mỗi 5 giây
             
             print("\n[+] HOÀN TẤT QUY TRÌNH!")
 
