@@ -56,7 +56,7 @@ class autoBackupSMILE:
         self.app = None
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f: self.config = json.load(f)
-        else: self.config = {"more_options": None, "backup_db": None}
+        else: self.config = {"more_options": None, "backup_db": None, "ok_btn": None}
 
     def copy_with_progress(self, src, dst):
         """Sao chép file kèm hiển thị tiến trình %"""
@@ -83,7 +83,7 @@ class autoBackupSMILE:
             # STEP 0.5: Kiểm tra Remote
             print(f"\n[Step 0.5] Kiểm tra ổ mạng: {SOURCE_DIR}")
             if not os.path.exists(SOURCE_DIR):
-                print(f"   [!] Cảnh báo: Không truy cập được ổ mạng {SOURCE_DIR}. Hãy mở ổ này trong File Explorer trước.")
+                print(f"   [!] Cảnh báo: Không truy cập được ổ mạng. Hãy mở File Explorer trước.")
             else: print("   [OK] Kết nối remote sẵn sàng.")
 
             # STEP 1-5: SMILE Automation
@@ -101,21 +101,21 @@ class autoBackupSMILE:
             send_keys("{ESC}") # Xóa Popup
             time.sleep(3)
 
-            # Chỉ điểm More Options
+            # Bước 3: Chỉ điểm More Options
             if not self.config.get("more_options"):
                 self.config["more_options"] = VisualPicker("More Options").selected_coords
                 with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
             mouse.click(button='left', coords=tuple(self.config["more_options"]))
             time.sleep(3)
 
-            # Login 2 (Chỉ nhập Pass)
+            # Step 4: Login 2 (Chỉ nhập Pass)
             top = self.app.top_window()
             if any(w in top.window_text() for w in ["Log", "Pass", "Mật khẩu"]):
                 top.set_focus()
                 send_keys(PASS + "{ENTER}")
                 time.sleep(5)
 
-            # Chỉ điểm Backup Database
+            # Bước 5: Chỉ điểm Backup Database
             if not self.config.get("backup_db"):
                 self.config["backup_db"] = VisualPicker("Backup Database").selected_coords
                 with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
@@ -123,20 +123,24 @@ class autoBackupSMILE:
             time.sleep(2)
             send_keys("{ENTER}")
 
-            # STEP 6: Chờ 2 phút và thoát lịch sự
-            print("\n[Step 6] Chờ 2 phút sao lưu...")
-            for i in range(120, 0, -1):
-                if i % 20 == 0: print(f"   --> Còn {i} giây...")
-                time.sleep(1)
+            # STEP 6: Chỉ điểm OK (Xác nhận hoàn tất sao lưu)
+            print("\n[Step 6] Đang đợi bạn xác nhận bảng thông báo sao lưu hoàn tất (OK)...")
+            if not self.config.get("ok_btn"):
+                self.config["ok_btn"] = VisualPicker("Nút OK Khi Xong").selected_coords
+                with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
             
+            # Click vào nút OK để đóng bảng thông báo SMILE
+            mouse.click(button='left', coords=tuple(self.config["ok_btn"]))
+            time.sleep(2)
+
+            # Thoát lịch sự
             print("--> Đang gửi lệnh thoát lịch sự (Phím 0)...")
             try:
                 main_win = self.app.top_window()
                 main_win.set_focus()
-                send_keys("0") # Gửi phím 0 để thoát
+                send_keys("0")
                 time.sleep(3)
-            except:
-                print("   [!] Không gửi được phím 0 tự động.")
+            except: pass
 
             # STEP 7: Đẩy thẳng lên Drive với tiến trình
             print("\n[Step 7] Đẩy file backup mới nhất lên Drive...")
@@ -152,7 +156,7 @@ class autoBackupSMILE:
 
         except Exception as e:
             print(f"!! Lỗi: {e}")
-            input("\nĐã xảy ra lỗi. Nhấn ENTER để xem log và đóng...")
+            input("\nNhấn ENTER để thoát...")
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
