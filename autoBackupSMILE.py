@@ -123,12 +123,20 @@ class autoBackupSMILE:
             time.sleep(2)
             send_keys("{ENTER}")
 
-            # STEP 6: Chờ 2 phút
+            # STEP 6: Chờ 2 phút và thoát lịch sự
             print("\n[Step 6] Chờ 2 phút sao lưu...")
             for i in range(120, 0, -1):
                 if i % 20 == 0: print(f"   --> Còn {i} giây...")
                 time.sleep(1)
-            if self.app: self.app.kill()
+            
+            print("--> Đang gửi lệnh thoát lịch sự (Phím 0)...")
+            try:
+                main_win = self.app.top_window()
+                main_win.set_focus()
+                send_keys("0") # Gửi phím 0 để thoát
+                time.sleep(3)
+            except:
+                print("   [!] Không gửi được phím 0 tự động.")
 
             # STEP 7: Đẩy thẳng lên Drive với tiến trình
             print("\n[Step 7] Đẩy file backup mới nhất lên Drive...")
@@ -137,7 +145,7 @@ class autoBackupSMILE:
                 latest = max(files, key=os.path.getmtime)
                 os.makedirs(DRIVE_DIR, exist_ok=True)
                 self.copy_with_progress(latest, os.path.join(DRIVE_DIR, os.path.basename(latest)))
-            else: print("   [!] Không tìm thấy file backup nào.")
+            else: print("   [!] Không tìm thấy file backup nào trên ổ mạng.")
 
             print(f"\n[+] TẤT CẢ ĐÃ XONG: {datetime.datetime.now()}")
             input("\nNhấn phím ENTER để đóng cửa sổ...")
