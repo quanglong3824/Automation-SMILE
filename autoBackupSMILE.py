@@ -18,16 +18,15 @@ class VisualPicker:
     def __init__(self, label):
         self.root = tk.Tk()
         self.root.title("Chỉ điểm tọa độ")
-        self.root.attributes("-alpha", 0.3) # Độ trong suốt 30%
+        self.root.attributes("-alpha", 0.3) 
         self.root.attributes("-fullscreen", True)
         self.root.attributes("-topmost", True)
         self.root.config(cursor="cross")
         
         self.label_text = f"HÃY CLICK VÀO NÚT: [{label.upper()}]"
-        self.canvas = tk.Canvas(self.root, cursor="cross", bg="green")
+        self.canvas = tk.Canvas(self.root, cursor="cross", bg="blue") # Đổi sang màu xanh dương cho dễ nhìn
         self.canvas.pack(fill="both", expand=True)
         
-        # Tạo hiệu ứng nháy nháy
         self.text_id = self.canvas.create_text(
             self.root.winfo_screenwidth() // 2, 
             self.root.winfo_screenheight() // 2,
@@ -46,7 +45,6 @@ class VisualPicker:
         self.root.after(500, self.blink)
 
     def on_click(self, event):
-        # Lấy tọa độ tuyệt đối trên màn hình
         self.selected_coords = [event.x_root, event.y_root]
         self.root.destroy()
 
@@ -69,36 +67,32 @@ class autoBackupSMILE:
         print(f"--> Đã lưu tọa độ vào {CONFIG_FILE}")
 
     def get_user_click_visual(self, label):
-        """Mở màn hình xanh nháy nháy để người dùng click"""
-        print(f"--> Đang chờ bạn click chọn vị trí: {label}")
+        print(f"--> Đang chờ bạn chỉ điểm vị trí: {label}")
         picker = VisualPicker(label)
-        if picker.selected_coords:
-            print(f"   [+] Đã ghi nhớ tọa độ: {picker.selected_coords}")
-            return picker.selected_coords
-        return None
+        return picker.selected_coords
 
     def run(self):
         try:
             print(f"--- BẮT ĐẦU: {datetime.datetime.now()} ---")
             
-            # BƯỚC 1: Khởi động & Đăng nhập (Auto)
+            # BƯỚC 1: Khởi động & Đăng nhập 1
             print("Step 1: Khởi động SMILE...")
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
             
             dlg = self.app.window(title_re=".*Log.*In.*")
             if dlg.exists():
-                print("--> Đăng nhập...")
+                print("--> Đăng nhập lần 1...")
                 dlg.set_focus()
                 send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
                 time.sleep(15)
 
-            # BƯỚC 2: Xóa Popup (Auto)
-            print("Step 2: Đang dọn dẹp Popup...")
+            # BƯỚC 2: Xóa Popup
+            print("Step 2: Dọn dẹp Popup thông báo...")
             send_keys("{ESC}")
             time.sleep(3)
 
-            # BƯỚC 3: More Options (Chọn bằng cách click chuột vào màn hình xanh)
+            # BƯỚC 3: More Options (Chỉ điểm/Click)
             if not self.config.get("more_options"):
                 self.config["more_options"] = self.get_user_click_visual("More Options")
                 self.save_config()
@@ -106,17 +100,24 @@ class autoBackupSMILE:
             print("Step 3: Click 'More Options'...")
             x, y = self.config["more_options"]
             mouse.click(button='left', coords=(x, y))
-            time.sleep(5)
+            time.sleep(3)
 
-            # BƯỚC 4: Đăng nhập lần 2 (Auto)
-            print("Step 4: Xác thực lần 2...")
-            auth_dlg = self.app.top_window()
-            if any(word in auth_dlg.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
-                auth_dlg.set_focus()
-                send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
-                time.sleep(5)
+            # BƯỚC 4: Tự động Đăng nhập lần 2 (Chỉ nhập PASS)
+            print("Step 4: Đang tự động xác thực mật khẩu lần 2...")
+            # Đợi bảng Login 2 xuất hiện
+            auth_wait_start = time.time()
+            while time.time() - auth_wait_start < 10:
+                top_win = self.app.top_window()
+                if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
+                    print("   [+] Đã thấy bảng xác thực. Đang nhập mật khẩu...")
+                    top_win.set_focus()
+                    # Vì USER 'IT' đã có sẵn, nhấn TAB để chắc chắn nhảy vào ô Pass (hoặc nhập luôn)
+                    send_keys("{TAB}" + PASS + "{ENTER}")
+                    time.sleep(5)
+                    break
+                time.sleep(1)
 
-            # BƯỚC 5: Backup Database
+            # BƯỚC 5: Backup Database (Chỉ điểm/Click)
             if not self.config.get("backup_db"):
                 self.config["backup_db"] = self.get_user_click_visual("Backup Database")
                 self.save_config()
@@ -126,19 +127,21 @@ class autoBackupSMILE:
             mouse.click(button='left', coords=(x, y))
             
             # BƯỚC 6: Đợi nút OK
-            print("Step 6: Đang chờ Database backup xong (60s)...")
-            time.sleep(60)
+            print("Step 6: Đang chờ Database xử lý (60s)...")
+            time.sleep(60) # Chờ backup chạy
+            
             if not self.config.get("ok_btn"):
                 self.config["ok_btn"] = self.get_user_click_visual("Nút OK Hoàn tất")
                 self.save_config()
             
+            print("--> Click OK để hoàn tất.")
             x, y = self.config["ok_btn"]
             mouse.click(button='left', coords=(x, y))
             
             print("\n[+] HOÀN TẤT QUY TRÌNH!")
 
         except Exception as e:
-            print(f"!! Lỗi: {e}")
+            print(f"!! Lỗi hệ thống: {e}")
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
