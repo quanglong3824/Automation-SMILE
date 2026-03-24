@@ -117,47 +117,18 @@ class autoBackupSMILE:
                 except: pass
                 time.sleep(1)
 
-            # BƯỚC 5: Backup Database (Chỉ điểm/Click)
+            # BƯỚC 5: Backup Database & Enter (BƯỚC CUỐI)
             if not self.config.get("backup_db"):
                 self.config["backup_db"] = self.get_user_click_visual("Backup Database")
                 self.save_config()
 
-            print("Step 5: Click 'Backup Database'...")
+            print("Step 5: Click 'Backup Database' và nhấn ENTER...")
             x, y = self.config["backup_db"]
             mouse.click(button='left', coords=(x, y))
+            time.sleep(2) # Chờ 2 giây để bảng hội thoại hiện ra (nếu có)
+            send_keys("{ENTER}") # Nhấn Enter để bắt đầu/xác nhận
             
-            # BƯỚC 6: Đợi nút OK (Tự động hoàn toàn)
-            print("Step 6: ĐANG CHẠY BACKUP... Đợi hiện thông báo thành công (OK)...")
-            # Database thường mất 1-2 phút, bot sẽ đợi tối đa 10 phút
-            start_wait = time.time()
-            found_ok = False
-            
-            while time.time() - start_wait < 600:
-                try:
-                    # Kiểm tra cửa sổ trên cùng hiện tại
-                    top_win = self.app.top_window()
-                    # Quét xem có nút OK, Đồng ý, Yes, Close nào không
-                    elements = top_win.descendants()
-                    for el in elements:
-                        txt = el.window_text().upper()
-                        if any(ok_txt in txt for ok_txt in ["OK", "ĐỒNG Ý", "YES", "XÁC NHẬN", "SUCCESS"]):
-                            print(f"   [+] Đã thấy nút '{el.window_text()}'. Click hoàn tất!")
-                            el.click_input()
-                            found_ok = True
-                            break
-                    if found_ok: break
-                except: pass
-                
-                # Nếu chờ quá 1 phút rưỡi mà không thấy quét được text, thử nhấn Enter cầu may
-                if time.time() - start_wait > 90:
-                    print("   [-] Chờ hơi lâu, thử nhấn phím ENTER dự phòng...")
-                    send_keys("{ENTER}")
-                    found_ok = True
-                    break
-                    
-                time.sleep(5) # Kiểm tra lại mỗi 5 giây
-            
-            print("\n[+] HOÀN TẤT QUY TRÌNH!")
+            print("\n[+] ĐÃ GỬI LỆNH BACKUP THÀNH CÔNG! QUY TRÌNH HOÀN TẤT.")
 
         except Exception as e:
             print(f"!! Lỗi hệ thống: {e}")
