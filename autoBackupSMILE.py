@@ -14,10 +14,9 @@ USER = "IT"
 PASS = "123@123a"
 CONFIG_FILE = "smile_config.json"
 
-# Cấu hình Google Drive (Download bằng gdown)
-# Dán link share của bạn vào đây
-GD_SHARE_LINK = "https://drive.google.com/uc?id=YOUR_FILE_ID" 
-DOWNLOAD_DEST = r"C:\SMILE_Setup\config_new.json" # Nơi lưu tệp tải về
+# Cấu hình Google Drive (Tải cả thư mục bằng gdown)
+GD_FOLDER_URL = "https://drive.google.com/drive/folders/15dTWt2vgwOtFDLXrz9GU8vJ-7m9k9gkC?usp=sharing"
+DOWNLOAD_DEST_DIR = r"C:\SMILE_Setup" # Thư mục lưu các file tải về từ Drive
 
 # Cấu hình Backup (Upload lên ổ mạng/Drive máy)
 SOURCE_DIR = r"\\192.168.1.2\smile$"
@@ -75,19 +74,19 @@ class autoBackupSMILE:
         with open(CONFIG_FILE, 'w') as f:
             json.dump(self.config, f, indent=4)
 
-    def download_from_drive(self):
-        """Sử dụng gdown để tải tệp từ Google Drive"""
-        print(f"\n[Step 0] Đang tải tệp từ Google Drive bằng gdown...")
+    def download_folder_from_drive(self):
+        """Sử dụng gdown để tải toàn bộ thư mục từ Google Drive"""
+        print(f"\n[Step 0] Đang đồng bộ thư mục từ Google Drive...")
         try:
             # Đảm bảo thư mục đích tồn tại
-            os.makedirs(os.path.dirname(DOWNLOAD_DEST), exist_ok=True)
+            os.makedirs(DOWNLOAD_DEST_DIR, exist_ok=True)
             
-            # Tải tệp
-            gdown.download(GD_SHARE_LINK, DOWNLOAD_DEST, quiet=False)
-            print(f"   [+] Đã tải xong tệp vào: {DOWNLOAD_DEST}")
+            # Tải toàn bộ folder
+            gdown.download_folder(url=GD_FOLDER_URL, output=DOWNLOAD_DEST_DIR, quiet=False, use_cookies=False)
+            print(f"   [+] Đã tải/cập nhật toàn bộ thư mục vào: {DOWNLOAD_DEST_DIR}")
             return True
         except Exception as e:
-            print(f"   [!] Lỗi khi dùng gdown: {e}")
+            print(f"   [!] Lỗi khi tải thư mục từ Drive: {e}")
             return False
 
     def sync_to_drive(self):
@@ -107,10 +106,10 @@ class autoBackupSMILE:
 
     def run(self):
         try:
-            # BƯỚC 0: Tải tệp hỗ trợ từ Drive (Nếu cần)
-            # self.download_from_drive() 
+            # BƯỚC 0: Tải/Cập nhật dữ liệu từ Drive trước khi làm việc
+            self.download_folder_from_drive() 
 
-            print(f"--- BẮT ĐẦU: {datetime.datetime.now()} ---")
+            print(f"--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
             
             # Step 1: Mở app & Login
             self.app = Application(backend="win32").start(SMILE_PATH)
@@ -132,12 +131,18 @@ class autoBackupSMILE:
             mouse.click(button='left', coords=tuple(self.config["more_options"]))
             time.sleep(3)
 
-            # Step 4: Login 2
-            top_win = self.app.top_window()
-            if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
-                top_win.set_focus()
-                send_keys(PASS + "{ENTER}")
-                time.sleep(5)
+            # Step 4: Login 2 (Chỉ nhập Pass)
+            auth_wait_start = time.time()
+            while time.time() - auth_wait_start < 10:
+                try:
+                    top_win = self.app.top_window()
+                    if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
+                        top_win.set_focus()
+                        send_keys(PASS + "{ENTER}")
+                        time.sleep(5)
+                        break
+                except: pass
+                time.sleep(1)
 
             # Step 5: Backup & Enter
             if not self.config.get("backup_db"):
@@ -155,10 +160,10 @@ class autoBackupSMILE:
             # Step 7: Đồng bộ lên Drive máy
             self.sync_to_drive()
             
-            print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
+            print(f"\n[+] HOÀN TẤT TOÀN BỘ CÔNG VIỆC: {datetime.datetime.now()}")
 
         except Exception as e:
-            print(f"!! Lỗi: {e}")
+            print(f"!! Lỗi hệ thống: {e}")
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
