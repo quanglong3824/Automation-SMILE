@@ -1,99 +1,114 @@
 import time
 import datetime
-from pywinauto import Application
+from pywinauto import Application, mouse
 from pywinauto.keyboard import send_keys
 
-# ==================== CONFIG ====================
+# ==================== CONFIG (BẠN CÓ THỂ CHỈNH Ở ĐÂY) ====================
 SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
 USER = "IT"
 PASS = "123@123a"
-# ================================================
 
-def deep_scan_and_click(window, target_text):
-    """Quét cực sâu toàn bộ các thành phần để tìm chữ và CLICK"""
-    print(f"--> Đang quét tìm chữ: '{target_text}'...")
+# Tọa độ dự phòng nếu không quét được chữ (X, Y)
+# Bạn có thể lấy tọa độ này bằng cách mở Paint, di chuột vào nút và nhìn góc dưới
+MORE_OPTIONS_COORDS = (50, 680) # Ví dụ: Góc dưới bên trái
+BACKUP_DB_COORDS = (300, 400)   # Ví dụ: Giữa màn hình menu
+# ========================================================================
+
+def force_focus_and_click(window, coords=None, target_text=None):
+    """Kích hoạt cửa sổ và Click bằng mọi giá"""
     try:
-        # Lấy tất cả các thành phần (kể cả những thành phần bị ẩn hoặc lồng sâu)
-        elements = window.descendants()
-        for el in elements:
-            try:
-                content = el.window_text()
-                # Nếu thấy chữ cần tìm trong text của thành phần đó
-                if content and target_text.lower() in content.lower():
-                    print(f"   [+] ĐÃ THẤY '{content}'! Đang click chuột...")
-                    # Đưa chuột đến và click (dùng click_input để giả lập chuột thật)
-                    el.click_input()
-                    return True
-            except:
-                continue
+        window.set_focus()
+        time.sleep(1)
+        
+        # Cách 1: Thử tìm theo chữ (Dùng backend 'uia' mạnh hơn)
+        if target_text:
+            print(f"--> Đang lùng sục chữ: '{target_text}'...")
+            for el in window.descendants():
+                try:
+                    if target_text.lower() in el.window_text().lower():
+                        print(f"   [+] Đã thấy '{target_text}'. Click chuột ngay!")
+                        el.click_input()
+                        return True
+                except: continue
+
+        # Cách 2: Nếu không thấy chữ, click theo tọa độ dự phòng
+        if coords:
+            print(f"   [-] Không thấy chữ, dùng 'Tuyệt chiêu' Click tọa độ: {coords}")
+            # Click vào tọa độ tương đối trong cửa sổ
+            window.click_input(coords=coords)
+            return True
+            
         return False
     except Exception as e:
-        print(f"   [!] Lỗi khi quét: {e}")
+        print(f"   [!] Lỗi khi click: {e}")
         return False
 
 def autoBackupSMILE():
     try:
-        print(f"--- BẮT ĐẦU QUY TRÌNH (BẢN QUÉT TEXT): {datetime.datetime.now()} ---")
+        print(f"--- BẮT ĐẦU QUY TRÌNH (BẢN TỌA ĐỘ CHÍNH XÁC): {datetime.datetime.now()} ---")
         
-        # 1. Khởi động
+        # 1. Khởi động với Backend UIA (Hiện đại hơn, dễ quét chữ hơn)
         print("Bước 1: Khởi động SMILE...")
-        app = Application(backend="win32").start(SMILE_PATH)
+        app = Application(backend="uia").start(SMILE_PATH)
         time.sleep(10)
 
-        # 2. Đăng nhập lần 1
-        dlg = app.window(title_re=".*Log.*In.*")
-        if dlg.exists():
-            print("--> Đang đăng nhập lần 1...")
-            dlg.set_focus()
-            send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
-            time.sleep(15)
+        # 2. Đăng nhập
+        try:
+            dlg = app.window(title_re=".*Log.*In.*")
+            if dlg.exists():
+                print("--> Đăng nhập...")
+                dlg.set_focus()
+                send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
+                time.sleep(15)
+        except:
+            print("--> Bỏ qua đăng nhập (có thể đã vào sẵn).")
 
-        # 3. Quét và Đóng Popup Sinh nhật/Thông báo
-        print("Bước 2: Dọn dẹp Popup...")
+        # 3. Dọn dẹp Popup (Bắt buộc click để lấy lại Focus)
+        print("Bước 2: Dọn dẹp Popup & Lấy lại Focus...")
         top_win = app.top_window()
-        # Tìm bất kỳ nút nào có chữ Đóng, Close, Thoát để click
-        if not deep_scan_and_click(top_win, "Close"):
-            deep_scan_and_click(top_win, "Đóng")
-            # Nếu vẫn không thấy, nhấn ESC dự phòng
-            send_keys("{ESC}")
-        time.sleep(3)
+        # Thử bấm phím ESC để đóng nhanh
+        send_keys("{ESC}")
+        time.sleep(2)
+        # Click vào một khoảng trống trên cửa sổ chính để lấy lại quyền kiểm soát
+        top_win.click_input(coords=(100, 10)) 
 
-        # 4. Bước then chốt: Quét tìm "More Options"
-        print("Bước 3: Truy tìm 'More Options' trên toàn màn hình...")
-        main_win = app.top_window() # Lấy cửa sổ đang hiện hữu
-        if not deep_scan_and_click(main_win, "More Options"):
-            print("   [-] Không thấy chữ 'More Options', thử quét phím '0'...")
-            if not deep_scan_and_click(main_win, "0"):
-                # Nếu quét không ra, gửi phím 0 mù
-                send_keys("0")
-        
+        # 4. Click 'More Options'
+        print("Bước 3: Mở 'More Options'...")
+        # Thử quét chữ trước, nếu xịt thì bấm vào tọa độ (50, 680)
+        if not force_focus_and_click(top_win, target_text="More Options", coords=MORE_OPTIONS_COORDS):
+            print("   [!] Không thể kích hoạt More Options.")
+
         time.sleep(5)
 
-        # 5. Đăng nhập lần 2 (Nếu có bảng hiện ra)
-        print("Bước 4: Xác thực lần 2...")
+        # 5. Đăng nhập lần 2
+        print("Bước 4: Xác thực mật khẩu...")
         auth_dlg = app.top_window()
         if "Log" in auth_dlg.window_text() or "Pass" in auth_dlg.window_text():
             auth_dlg.set_focus()
             send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
             time.sleep(5)
 
-        # 6. Quét tìm "Backup Database"
+        # 6. Click 'Backup Database'
         print("Bước 5: Chạy Backup...")
         options_win = app.top_window()
-        if not deep_scan_and_click(options_win, "Backup Database"):
-            send_keys("a") # Phím tắt dự phòng
-        
-        # 7. Đợi bảng OK hoàn tất
-        print("--> ĐANG CHẠY BACKUP... Đợi hiện nút OK (1-2 phút)...")
+        if not force_focus_and_click(options_win, target_text="Backup Database", coords=BACKUP_DB_COORDS):
+            send_keys("a") # Cuối cùng mới dùng phím tắt
+
+        # 7. Đợi bảng OK
+        print("--> ĐANG CHẠY... Đợi hiện nút OK (1-2 phút)...")
         start_wait = time.time()
         while time.time() - start_wait < 600:
             final_popup = app.top_window()
-            if deep_scan_and_click(final_popup, "OK") or deep_scan_and_click(final_popup, "Đồng ý"):
-                print("--> THÀNH CÔNG! Đã hoàn tất sao lưu.")
-                break
+            # Quét tìm nút OK hoặc Đồng ý
+            found = False
+            for el in final_popup.descendants():
+                if any(ok in el.window_text().upper() for ok in ["OK", "ĐỒNG Ý", "YES"]):
+                    el.click_input()
+                    print("--> THÀNH CÔNG!")
+                    found = True
+                    break
+            if found: break
             time.sleep(5)
-
-        print("--- KẾT THÚC ---")
 
     except Exception as e:
         print(f"!! Lỗi: {e}")
