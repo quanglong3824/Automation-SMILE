@@ -1,158 +1,110 @@
 import time
-import datetime
+import json
 import os
-from pywinauto import Application
+from pywinauto import Application, mouse
 from pywinauto.keyboard import send_keys
+import keyboard  # Cần cài đặt: pip install keyboard
 
-# ==================== CONFIG ====================
-SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
-USER = "IT"
-PASS = "123@123a"
+# File lưu trữ kịch bản
+ACTION_FILE = "smile_actions.json"
 
 class autoBackupSMILE:
     def __init__(self):
+        self.actions = []
         self.app = None
-        self.main_win = None
 
-    def start_and_login(self):
-        """MODULE 1: Khởi động và Đăng nhập lần đầu"""
-        print("--> [Module 1] Đang khởi động/kết nối SMILE...")
-        try:
-            self.app = Application(backend="win32").connect(path=SMILE_PATH)
-        except:
-            self.app = Application(backend="win32").start(SMILE_PATH)
-        
-        time.sleep(10)
-        dlg = self.app.window(title_re=".*Log.*In.*")
-        if dlg.exists():
-            print("   [+] Đang thực hiện đăng nhập...")
-            dlg.set_focus()
-            send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
-            time.sleep(15)
-        return True
+    def save_actions(self):
+        with open(ACTION_FILE, 'w', encoding='utf-8') as f:
+            json.dump(self.actions, f, ensure_ascii=False, indent=4)
+        print(f"\n[+] Đã lưu {len(self.actions)} hành động vào {ACTION_FILE}")
 
-    def close_annoying_popups(self):
-        """MODULE 2: Tìm và đóng các bảng chặn (Popup Sinh nhật/Thông báo)"""
-        print("--> [Module 2] Đang quét dọn các bảng Popup...")
-        try:
-            # Thử tìm các cửa sổ trên cùng không phải cửa sổ chính
-            top_win = self.app.top_window()
-            title = top_win.window_text()
-            
-            # Nếu thấy các từ khóa popup
-            if any(word in title for word in ["Happy", "Birth", "Notice", "Thông báo", "Sinh nhật"]):
-                print(f"   [!] Phát hiện bảng: '{title}'. Đang đóng bằng ESC...")
-                top_win.set_focus()
-                top_win.type_keys("{ESC}")
-                time.sleep(3)
-                
-            # Quét thêm lần nữa tìm nút 'Close' bên trong nếu ESC không ăn
-            for el in top_win.descendants():
-                if "close" in el.window_text().lower() or "đóng" in el.window_text().lower():
-                    print(f"   [+] Tìm thấy nút '{el.window_text()}'. Click để đóng...")
-                    el.click_input()
-                    time.sleep(2)
-                    break
-        except:
-            print("   [-] Không thấy popup nào.")
-        return True
-
-    def trigger_more_options(self):
-        """MODULE 3: Click chuột vào 'More Options' (Bắt buộc dùng chuột)"""
-        print("--> [Module 3] Đang truy tìm nút 'More Options' để CLICK CHUỘT...")
-        try:
-            # 1. Lấy cửa sổ chính và focus
-            all_wins = self.app.windows(title_re=".*SMILE.*")
-            self.main_win = max(all_wins, key=lambda w: w.rectangle().width() * w.rectangle().height())
-            self.main_win.set_focus()
-            time.sleep(2) # Chờ 1 chút sau khi đóng popup ở Module 2
-            
-            # 2. Quét tìm chữ 'More Options' (hoặc '0. More Options')
-            found = False
-            elements = self.main_win.descendants()
-            for el in elements:
-                txt = el.window_text()
-                # Kiểm tra nếu text chứa "More Options"
-                if txt and "more options" in txt.lower():
-                    print(f"   [+] ĐÃ TÌM THẤY: '{txt}'. Đang CLICK CHUỘT trực tiếp...")
-                    # Lấy tọa độ và click vào giữa element đó
-                    el.click_input()
-                    found = True
-                    break
-            
-            # 3. Phương án dự phòng: Tìm nút có số '0'
-            if not found:
-                print("   [-] Không tìm thấy chữ 'More Options', thử quét tìm nút có số '0'...")
-                for el in elements:
-                    if el.window_text() == "0":
-                        print("   [+] Tìm thấy nút '0'. Click chuột...")
-                        el.click_input()
-                        found = True
-                        break
-            
-            if not found:
-                print("   [!] CẢNH BÁO: Không tìm thấy mục 'More Options' trên màn hình để click.")
-                return False
-
-            time.sleep(5) # Đợi bảng đăng nhập lần 2 hiện ra
+    def load_actions(self):
+        if os.path.exists(ACTION_FILE):
+            with open(ACTION_FILE, 'r', encoding='utf-8') as f:
+                self.actions = json.load(f)
             return True
-        except Exception as e:
-            print(f"   [!] Lỗi Module 3: {e}")
-            return False
-
-    def handle_second_login(self):
-        """MODULE 4: Đăng nhập lần 2 (Sau khi click More Options)"""
-        print("--> [Module 4] Đăng nhập xác thực lần 2...")
-        try:
-            auth_dlg = self.app.top_window()
-            if any(word in auth_dlg.window_text() for word in ["Log", "Pass", "Mật khẩu", "Xác nhận"]):
-                print("   [+] Đang nhập User/Pass lần 2...")
-                auth_dlg.set_focus()
-                send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
-                time.sleep(5)
-        except:
-            print("   [-] Không thấy yêu cầu đăng nhập lần 2.")
-        return True
-
-    def run_backup_process(self):
-        """MODULE 5: Chạy Backup và đợi bảng OK"""
-        print("--> [Module 5] Đang thực hiện Backup Database...")
-        try:
-            # Thử click chữ "Backup Database" trước
-            top = self.app.top_window()
-            found_backup = False
-            for el in top.descendants():
-                if "backup database" in el.window_text().lower():
-                    print("   [+] Đã thấy chữ 'Backup Database'. Click chuột...")
-                    el.click_input()
-                    found_backup = True
-                    break
-            
-            # Nếu không thấy chữ, nhấn phím A
-            if not found_backup:
-                print("   [-] Không quét được chữ, gửi phím 'A'...")
-                send_keys("a")
-            
-            print("   [+] Đang đợi bảng OK (1-2 phút)...")
-            start_wait = time.time()
-            while time.time() - start_wait < 600:
-                final_popup = self.app.top_window()
-                for el in final_popup.descendants():
-                    txt = el.window_text().upper()
-                    if any(ok_txt in txt for ok_txt in ["OK", "ĐỒNG Ý", "SUCCESS", "HOÀN TẤT"]):
-                        print(f"   [+] THÀNH CÔNG! Đã bấm nút '{el.window_text()}'.")
-                        el.click_input()
-                        return True
-                time.sleep(5)
-        except Exception as e:
-            print(f"   [!] Lỗi Module 5: {e}")
         return False
 
-if __name__ == "__main__":
+    def record_mode(self):
+        """TẠO HÀNH ĐỘNG MỚI: Ghi lại tọa độ chuột và phím bấm"""
+        print("\n=== CHẾ ĐỘ GHI HÀNH ĐỘNG (RECORD MODE) ===")
+        print("- Di chuyển chuột đến vị trí cần Click và nhấn phím 'S' (Save Click)")
+        print("- Để nhập văn bản/phím, nhấn phím 'K' (Key) sau đó nhập phím cần lưu")
+        print("- Nhấn phím 'E' (Exit) để kết thúc và lưu kịch bản")
+        
+        self.actions = []
+        
+        while True:
+            # Ghi tọa độ click chuột khi nhấn 'S'
+            if keyboard.is_pressed('s'):
+                pos = mouse.position()
+                self.actions.append({"type": "click", "pos": [pos[0], pos[1]]})
+                print(f"  [+] Đã ghi Click tại: {pos}")
+                time.sleep(0.5) # Tránh ghi trùng
+
+            # Ghi phím bấm khi nhấn 'k'
+            elif keyboard.is_pressed('k'):
+                key = input("  > Nhập phím hoặc chuỗi văn bản (VD: IT, {TAB}, {ENTER}): ")
+                self.actions.append({"type": "key", "value": key})
+                print(f"  [+] Đã ghi phím: {key}")
+                time.sleep(0.5)
+
+            # Kết thúc khi nhấn 'e'
+            elif keyboard.is_pressed('e'):
+                self.save_actions()
+                break
+            
+            time.sleep(0.01)
+
+    def play_mode(self):
+        """THỰC THI HÀNH ĐỘNG: Tự động chạy lại kịch bản đã lưu"""
+        if not self.load_actions():
+            print("\n[!] Lỗi: Chưa có kịch bản nào được lưu. Hãy chọn mục 1 trước.")
+            return
+
+        print(f"\n=== ĐANG THỰC THI TỰ ĐỘNG ({len(self.actions)} bước) ===")
+        try:
+            for i, action in enumerate(self.actions):
+                print(f"  Step {i+1}: ", end="")
+                
+                if action["type"] == "click":
+                    x, y = action["pos"]
+                    print(f"Click chuột tại ({x}, {y})")
+                    mouse.click(button='left', coords=(x, y))
+                
+                elif action["type"] == "key":
+                    val = action["value"]
+                    print(f"Gửi phím/văn bản: {val}")
+                    send_keys(val)
+                
+                time.sleep(2) # Khoảng nghỉ giữa các bước (có thể điều chỉnh)
+            
+            print("\n[+] HOÀN TẤT QUY TRÌNH TỰ ĐỘNG.")
+        except Exception as e:
+            print(f"\n[!] Lỗi khi đang chạy: {e}")
+
+def main_menu():
     bot = autoBackupSMILE()
-    if bot.start_and_login():
-        bot.close_annoying_popups()
-        if bot.trigger_more_options():
-            bot.handle_second_login()
-            bot.run_backup_process()
-    print(f"\n--- KẾT THÚC QUY TRÌNH ---")
+    while True:
+        print("\n" + "="*30)
+        print("   autoBackupSMILE MENU")
+        print("="*30)
+        print("1. Tạo hành động mới (Record)")
+        print("2. Thực thi hành động đã lưu (Auto)")
+        print("0. Thoát")
+        print("-" * 30)
+        
+        choice = input("Chọn mục (0-2): ")
+        
+        if choice == '1':
+            bot.record_mode()
+        elif choice == '2':
+            bot.play_mode()
+        elif choice == '0':
+            print("Tạm biệt!")
+            break
+        else:
+            print("Lựa chọn không hợp lệ.")
+
+if __name__ == "__main__":
+    main_menu()
