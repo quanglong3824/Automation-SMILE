@@ -14,10 +14,6 @@ USER = "IT"
 PASS = "123@123a"
 CONFIG_FILE = "smile_config.json"
 
-# LINK THƯ MỤC GOOGLE DRIVE ĐỂ TẢI DỮ LIỆU ĐẦU VÀO
-GD_FOLDER_URL = "https://drive.google.com/drive/folders/15dTWt2vgwOtFDLXrz9GU8vJ-7m9k9gkC?usp=sharing"
-DOWNLOAD_DEST_DIR = r"C:\SMILE_Setup"
-
 # ĐƯỜNG DẪN Ổ MẠNG SMILE (Remote)
 SOURCE_DIR = r"\\192.168.1.2\smile$"
 # ================================================
@@ -95,12 +91,24 @@ class autoBackupSMILE:
 
     def run(self):
         try:
-            # STEP 0: Đồng bộ Drive đầu vào
-            print("\n[Step 0] Đang tải dữ liệu từ Google Drive (gdown)...")
-            os.makedirs(DOWNLOAD_DEST_DIR, exist_ok=True)
-            try:
-                gdown.download_folder(url=GD_FOLDER_URL, output=DOWNLOAD_DEST_DIR, quiet=True)
-            except: print("   [!] Không tải được dữ liệu từ Drive, bỏ qua...")
+            # STEP 0: KIỂM TRA ĐƯỜNG DẪN DRIVE VÀ REMOTE
+            print("\n[Step 0] Kiểm tra kết nối folder Remote và Google Drive...")
+            drive_path = self.find_google_drive_path()
+            
+            if not drive_path:
+                print("\n[!] LỖI: Không tìm thấy ứng dụng Google Drive hoặc thư mục 'SMILE BACKUP' trên máy.")
+                print("--> Vui lòng đảm bảo Google Drive Desktop đang chạy và đã ánh xạ ổ đĩa (thường là ổ G:).")
+                input("\nNhấn ENTER để thoát...")
+                return
+
+            if not os.path.exists(SOURCE_DIR):
+                print(f"\n[!] LỖI: Không thể truy cập ổ mạng Remote: {SOURCE_DIR}")
+                print("--> Hãy kiểm tra lại kết nối mạng hoặc quyền truy cập vào thư mục chia sẻ.")
+                input("\nNhấn ENTER để thoát...")
+                return
+
+            print(f"   [OK] Đã kết nối Drive: {drive_path}")
+            print(f"   [OK] Đã kết nối Remote: {SOURCE_DIR}")
 
             # STEP 1-5: SMILE FO
             print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
@@ -159,20 +167,13 @@ class autoBackupSMILE:
             time.sleep(3)
 
             # STEP 7: Đẩy lên Drive
-            print("\n[Step 7] Đang đồng bộ file backup lên Google Drive...")
-            drive_path = self.find_google_drive_path()
-            
-            if not drive_path:
-                print("\n[!] LỖI: Không tìm thấy ứng dụng Google Drive trên máy.")
-                print("--> Vui lòng cài đặt 'Google Drive cho máy tính' để kích hoạt tính năng này.")
+            print("\n[Step 7] Đang đồng bộ file backup mới nhất lên Google Drive...")
+            files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
+            if files:
+                latest = max(files, key=os.path.getmtime)
+                self.copy_with_progress(latest, os.path.join(drive_path, os.path.basename(latest)))
             else:
-                if os.path.exists(SOURCE_DIR):
-                    files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
-                    if files:
-                        latest = max(files, key=os.path.getmtime)
-                        self.copy_with_progress(latest, os.path.join(drive_path, os.path.basename(latest)))
-                    else: print("   [-] Không thấy file backup tại remote.")
-                else: print(f"   [-] Không truy cập được {SOURCE_DIR}")
+                print("   [-] Không thấy file backup tại remote.")
 
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
             input("\nNhấn ENTER để đóng cửa sổ...")
