@@ -12,45 +12,20 @@ from pywinauto.keyboard import send_keys
 SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
 USER = "IT"
 PASS = "123@123a"
-CONFIG_FILE = "smile_config.json"
+
+# TỌA ĐỘ VÀ THÔNG SỐ CỐ ĐỊNH
+MORE_OPTIONS_COORDS = (759, 408)
+BACKUP_DB_COORDS = (800, 324)
+OK_BTN_COORDS = (662, 447)
+BACKUP_DURATION = 5
 
 # ĐƯỜNG DẪN Ổ MẠNG SMILE (Remote)
 SOURCE_DIR = r"\\192.168.1.2\smile$"
 # ================================================
 
-class VisualPicker:
-    """Màn hình xanh để chỉ điểm tọa độ"""
-    def __init__(self, label):
-        self.root = tk.Tk()
-        self.root.attributes("-alpha", 0.3, "-fullscreen", True, "-topmost", True)
-        self.root.config(cursor="cross")
-        self.canvas = tk.Canvas(self.root, cursor="cross", bg="blue")
-        self.canvas.pack(fill="both", expand=True)
-        txt = f"HÃY CLICK VÀO NÚT: [{label.upper()}]"
-        self.text_id = self.canvas.create_text(
-            self.root.winfo_screenwidth() // 2, self.root.winfo_screenheight() // 2,
-            text=txt, font=("Arial", 30, "bold"), fill="white"
-        )
-        self.selected_coords = None
-        self.canvas.bind("<Button-1>", self.on_click)
-        self.blink()
-        self.root.mainloop()
-
-    def blink(self):
-        c = self.canvas.itemcget(self.text_id, "fill")
-        self.canvas.itemconfig(self.text_id, fill="yellow" if c == "white" else "white")
-        self.root.after(500, self.blink)
-
-    def on_click(self, event):
-        self.selected_coords = [event.x_root, event.y_root]
-        self.root.destroy()
-
 class autoBackupSMILE:
     def __init__(self):
         self.app = None
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f: self.config = json.load(f)
-        else: self.config = {"more_options": None, "backup_db": None, "ok_btn": None, "backup_duration": 60}
 
     def find_google_drive_path(self):
         """Tự động tìm kiếm ổ đĩa hoặc thư mục Google Drive trên Windows"""
@@ -160,10 +135,8 @@ class autoBackupSMILE:
             time.sleep(3)
 
             # More Options
-            if not self.config.get("more_options"):
-                self.config["more_options"] = VisualPicker("More Options").selected_coords
-                with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
-            mouse.click(button='left', coords=tuple(self.config["more_options"]))
+            print("   --> Click More Options")
+            mouse.click(button='left', coords=MORE_OPTIONS_COORDS)
             time.sleep(3)
 
             # Login 2
@@ -174,29 +147,20 @@ class autoBackupSMILE:
                 time.sleep(5)
 
             # Backup
-            if not self.config.get("backup_db"):
-                self.config["backup_db"] = VisualPicker("Backup Database").selected_coords
-                with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
-            
-            start_backup = time.time()
-            mouse.click(button='left', coords=tuple(self.config["backup_db"]))
+            print("   --> Click Backup Database")
+            mouse.click(button='left', coords=BACKUP_DB_COORDS)
             time.sleep(2)
             send_keys("{ENTER}")
 
             # Chờ Backup
-            if not self.config.get("ok_btn"):
-                self.config["ok_btn"] = VisualPicker("Nút OK Khi Xong").selected_coords
-                duration = int(time.time() - start_backup)
-                self.config["backup_duration"] = duration
-                with open(CONFIG_FILE, 'w') as f: json.dump(self.config, f, indent=4)
-            else:
-                wait_time = self.config.get("backup_duration", 60) + 30
-                print(f"\n[Step 6] TỰ ĐỘNG: Đang đợi backup ({wait_time} giây)...")
-                for i in range(wait_time, 0, -1):
-                    if i % 30 == 0: print(f"   --> Còn {i} giây...")
-                    time.sleep(1)
+            wait_time = BACKUP_DURATION + 30
+            print(f"\n[Step 6] TỰ ĐỘNG: Đang đợi backup ({wait_time} giây)...")
+            for i in range(wait_time, 0, -1):
+                if i % 30 == 0: print(f"   --> Còn {i} giây...")
+                time.sleep(1)
             
-            mouse.click(button='left', coords=tuple(self.config["ok_btn"]))
+            print("   --> Click OK sau backup")
+            mouse.click(button='left', coords=OK_BTN_COORDS)
             time.sleep(2)
             send_keys("0") # Thoát
             time.sleep(3)
@@ -212,6 +176,14 @@ class autoBackupSMILE:
 
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
             input("\nNhấn ENTER để đóng cửa sổ...")
+
+        except Exception as e:
+            print(f"!! Lỗi: {e}")
+            input("\nNhấn ENTER để thoát...")
+
+if __name__ == "__main__":
+    bot = autoBackupSMILE()
+    bot.run()
 
         except Exception as e:
             print(f"!! Lỗi: {e}")
