@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import shutil
 import datetime
 import tkinter as tk
 from pywinauto import Application, mouse
@@ -11,6 +12,11 @@ SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
 USER = "IT"
 PASS = "123@123a"
 CONFIG_FILE = "smile_config.json"
+
+# Cấu hình đường dẫn Backup
+SOURCE_DIR = r"\\192.168.1.2\smile$"
+# Thay đổi đường dẫn này thành thư mục Google Drive thực tế trên máy bạn
+DRIVE_DIR = r"C:\Users\YourUser\Google Drive\SMILE_Backup" 
 # ================================================
 
 class VisualPicker:
@@ -71,6 +77,43 @@ class autoBackupSMILE:
         picker = VisualPicker(label)
         return picker.selected_coords
 
+    def sync_to_drive(self):
+        """Tìm file mới nhất từ ổ mạng và copy sang Google Drive"""
+        print(f"\n[Step 7] Đang quét file mới nhất tại {SOURCE_DIR}...")
+        try:
+            # Kiểm tra xem thư mục nguồn có tồn tại không
+            if not os.path.exists(SOURCE_DIR):
+                print(f"   [!] Lỗi: Không thể truy cập đường dẫn {SOURCE_DIR}")
+                return
+
+            # Lấy danh sách tất cả các file trong thư mục nguồn
+            files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
+            
+            if not files:
+                print("   [-] Không tìm thấy file nào trong thư mục nguồn.")
+                return
+
+            # Tìm file có thời gian sửa đổi (mtime) mới nhất
+            latest_file = max(files, key=os.path.getmtime)
+            file_name = os.path.basename(latest_file)
+            
+            print(f"   [+] Đã tìm thấy file mới nhất: {file_name}")
+            print(f"   --> Thời gian tạo: {datetime.datetime.fromtimestamp(os.path.getmtime(latest_file))}")
+
+            # Kiểm tra thư mục Drive
+            if not os.path.exists(DRIVE_DIR):
+                os.makedirs(DRIVE_DIR)
+                print(f"   [+] Đã tạo thư mục Drive: {DRIVE_DIR}")
+
+            # Thực hiện copy
+            dest_path = os.path.join(DRIVE_DIR, file_name)
+            print(f"   --> Đang sao chép lên Drive...")
+            shutil.copy2(latest_file, dest_path)
+            print(f"   [OK] Đã đẩy file lên Drive thành công!")
+
+        except Exception as e:
+            print(f"   [!] Lỗi khi đồng bộ Drive: {e}")
+
     def run(self):
         try:
             print(f"--- BẮT ĐẦU: {datetime.datetime.now()} ---")
@@ -92,24 +135,22 @@ class autoBackupSMILE:
             send_keys("{ESC}")
             time.sleep(3)
 
-            # BƯỚC 3: More Options (Chỉ điểm/Click)
+            # BƯỚC 3: More Options
             if not self.config.get("more_options"):
                 self.config["more_options"] = self.get_user_click_visual("More Options")
                 self.save_config()
             
-            print("Step 3: Click 'More Options'...")
             x, y = self.config["more_options"]
             mouse.click(button='left', coords=(x, y))
             time.sleep(3)
 
             # BƯỚC 4: Tự động Đăng nhập lần 2
-            print("Step 4: Đang tự động xác thực mật khẩu lần 2...")
+            print("Step 4: Đang xác thực lần 2...")
             auth_wait_start = time.time()
             while time.time() - auth_wait_start < 10:
                 try:
                     top_win = self.app.top_window()
                     if any(word in top_win.window_text() for word in ["Log", "Pass", "Mật khẩu"]):
-                        print("   [+] Đã thấy bảng xác thực. Đang nhập mật khẩu...")
                         top_win.set_focus()
                         send_keys(PASS + "{ENTER}")
                         time.sleep(5)
@@ -128,18 +169,21 @@ class autoBackupSMILE:
             time.sleep(2)
             send_keys("{ENTER}")
             
-            # BƯỚC 6: Đóng ứng dụng sau 3 phút
-            print("\n[Step 6] ĐANG CHẠY SAO LƯU... Sẽ tự động đóng SMILE sau 3 phút.")
+            # BƯỚC 6: Đợi 3 phút và đóng app
+            print("\n[Step 6] ĐANG CHẠY SAO LƯU... Vui lòng đợi 3 phút.")
             for i in range(180, 0, -1):
-                if i % 30 == 0: # Thông báo mỗi 30 giây
+                if i % 30 == 0:
                     print(f"--> Còn lại {i} giây...")
                 time.sleep(1)
             
-            print("--> Hết thời gian chờ. Đang đóng SMILE...")
+            print("--> Đóng SMILE...")
             if self.app:
                 self.app.kill()
+
+            # BƯỚC 7: Đồng bộ file lên Drive (Mới)
+            self.sync_to_drive()
             
-            print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
+            print(f"\n[+] HOÀN TẤT TOÀN BỘ QUY TRÌNH: {datetime.datetime.now()}")
 
         except Exception as e:
             print(f"!! Lỗi hệ thống: {e}")
