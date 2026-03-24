@@ -26,6 +26,65 @@ def find_and_click_text(window, target_text):
         print(f"   [!] Lỗi khi quét text: {e}")
         return False
 
+def find_edit_controls(window):
+    """Quét và tìm tất cả các ô nhập liệu (Edit/TextBox) trên cửa sổ"""
+    edits = []
+    try:
+        for el in window.descendants():
+            class_name = el.friendly_class_name()
+            # Tìm các control có class là Edit, TextBox, hoặc tương tự
+            if class_name in ["Edit", "TextBox", "ComboBox"]:
+                edits.append(el)
+                print(f"   [SCAN] Tìm thấy ô nhập liệu: class='{class_name}', text='{el.window_text()}'")
+    except Exception as e:
+        print(f"   [!] Lỗi khi quét ô nhập liệu: {e}")
+    return edits
+
+def fill_login_form(window, username, password):
+    """Quét form login, tìm các ô input và điền User/Pass"""
+    print("--> Đang quét tìm các ô nhập liệu trên form Đăng nhập...")
+    edits = find_edit_controls(window)
+    
+    if len(edits) >= 2:
+        # Thường ô đầu tiên = User, ô thứ hai = Password
+        print(f"   [+] Tìm thấy {len(edits)} ô nhập liệu. Đang điền thông tin...")
+        
+        # Xóa nội dung cũ và nhập mới cho ô User
+        try:
+            edits[0].set_focus()
+            edits[0].set_edit_text(username)
+            print(f"   [+] Đã nhập User: '{username}' vào ô 1")
+        except:
+            edits[0].click_input()
+            edits[0].type_keys("^a" + username, with_spaces=True)
+            print(f"   [+] Đã gõ phím User: '{username}' vào ô 1 (dự phòng)")
+        
+        # Xóa nội dung cũ và nhập mới cho ô Password
+        try:
+            edits[1].set_focus()
+            edits[1].set_edit_text(password)
+            print(f"   [+] Đã nhập Password vào ô 2")
+        except:
+            edits[1].click_input()
+            edits[1].type_keys("^a" + password, with_spaces=True)
+            print(f"   [+] Đã gõ phím Password vào ô 2 (dự phòng)")
+        
+        return True
+    elif len(edits) == 1:
+        # Chỉ có 1 ô (có thể chỉ cần nhập Password)
+        print(f"   [+] Chỉ tìm thấy 1 ô. Nhập Password vào ô duy nhất...")
+        try:
+            edits[0].set_focus()
+            edits[0].set_edit_text(password)
+        except:
+            edits[0].click_input()
+            edits[0].type_keys("^a" + password, with_spaces=True)
+        return True
+    else:
+        print("   [-] Không tìm thấy ô nhập liệu nào. Thử gõ phím dự phòng...")
+        window.type_keys(username + "{TAB}" + password)
+        return False
+
 def run_backup():
     try:
         print(f"--- BẮT ĐẦU QUY TRÌNH BACKUP DATA: {datetime.datetime.now()} ---")
@@ -45,31 +104,32 @@ def run_backup():
                 win_text = top_login.window_text()
                 
                 # Quét text của cửa sổ hiện tại xem có phải là form Login không
-                if "Log" in win_text or "In" in win_text or "Password" in win_text or "User" in win_text:
+                if "Log" in win_text or "Password" in win_text or "User" in win_text or "Login" in win_text:
                     login_found = True
                     print(f"--> Đã tìm thấy form Đăng nhập (Window: '{win_text}')!")
                     top_login.set_focus()
+                    time.sleep(1)
                     
-                    # Login Name 'IT' đã có sẵn, chỉ cần Tab sang Pass
-                    print("--> Nhập mật khẩu...")
-                    top_login.type_keys("{TAB}" + PASS)
+                    # Quét tìm ô input User/Pass và điền trực tiếp
+                    fill_login_form(top_login, USER, PASS)
+                    time.sleep(1)
                     
-                    # Dùng quét text để tìm và click nút 'Log In' hoặc 'OK' trên form đăng nhập
-                    if not find_and_click_text(top_login, "OK") and not find_and_click_text(top_login, "Log In"):
+                    # Quét text để tìm và click nút đăng nhập trên form
+                    if not find_and_click_text(top_login, "OK") and not find_and_click_text(top_login, "Log In") and not find_and_click_text(top_login, "Login"):
                         print("!! Không quét được text nút Đăng nhập, gửi phím ENTER dự phòng.")
                         top_login.type_keys("{ENTER}")
                     
                     print("--> Đã Gửi lệnh Đăng nhập thành công. Đợi 15s...")
                     time.sleep(15)
                     break
-            except:
-                pass
+            except Exception as ex:
+                print(f"   [!] Lỗi khi quét form login: {ex}")
             time.sleep(2)
             
         if not login_found:
-            print("!! Không tìm thấy form đăng nhập sau 30s. Tiếp tục chạy dự phòng...")
+            print("!! Không tìm thấy form đăng nhập sau 30s. Thử gõ phím dự phòng...")
             try:
-                app.top_window().type_keys("{TAB}" + PASS + "{ENTER}")
+                app.top_window().type_keys(USER + "{TAB}" + PASS + "{ENTER}")
                 time.sleep(15)
             except:
                 pass
@@ -94,10 +154,20 @@ def run_backup():
 
         # 5. Xác thực mật khẩu lần 2 (nếu có hiện bảng Login tiếp theo)
         auth_dlg = app.top_window()
-        if "Log" in auth_dlg.window_text() or "Password" in auth_dlg.window_text():
-            print("--> Xác thực mật khẩu lần 2...")
+        auth_text = auth_dlg.window_text()
+        if "Log" in auth_text or "Password" in auth_text or "User" in auth_text or "Login" in auth_text:
+            print(f"--> Phát hiện form xác thực lần 2 (Window: '{auth_text}')...")
             auth_dlg.set_focus()
-            auth_dlg.type_keys(USER + "{TAB}" + PASS + "{ENTER}")
+            time.sleep(1)
+            
+            # Quét tìm ô input và điền User/Pass
+            fill_login_form(auth_dlg, USER, PASS)
+            time.sleep(1)
+            
+            # Quét text nút OK/Login để click
+            if not find_and_click_text(auth_dlg, "OK") and not find_and_click_text(auth_dlg, "Log In") and not find_and_click_text(auth_dlg, "Login"):
+                print("!! Không quét được nút đăng nhập lần 2, gửi phím ENTER dự phòng.")
+                auth_dlg.type_keys("{ENTER}")
             time.sleep(5)
 
         # 6. Gửi chữ 'A' để chạy Backup Database
