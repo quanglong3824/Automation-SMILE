@@ -4,6 +4,8 @@ import os
 import shutil
 import datetime
 import tkinter as tk
+import ctypes
+import subprocess
 from pywinauto import Application, mouse
 from pywinauto.keyboard import send_keys
 
@@ -25,6 +27,39 @@ SOURCE_DIR = r"\\192.168.1.2\smile$"
 class autoBackupSMILE:
     def __init__(self):
         self.app = None
+
+    def set_input_lock(self, lock=True):
+        """Khóa hoặc mở khóa bàn phím và chuột (Yêu cầu quyền Administrator)"""
+        try:
+            ctypes.windll.user32.BlockInput(lock)
+            if lock:
+                print("   [!] ĐÃ KHÓA BÀN PHÍM VÀ CHUỘT. Vui lòng không chạm vào máy.")
+            else:
+                print("   [OK] Đã mở khóa bàn phím và chuột.")
+        except Exception:
+            print("   [!] Cảnh báo: Không thể khóa/mở khóa input (Cần chạy với quyền Administrator).")
+
+    def focus_terminal(self):
+        """Đưa cửa sổ Terminal lên vị trí cao nhất (Topmost)"""
+        try:
+            hWnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hWnd:
+                # SW_RESTORE = 9, HWND_TOPMOST = -1
+                ctypes.windll.user32.ShowWindow(hWnd, 9)
+                ctypes.windll.user32.SetForegroundWindow(hWnd)
+                ctypes.windll.user32.SetWindowPos(hWnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002) 
+                print("   --> Đã đưa Terminal lên trên cùng để theo dõi.")
+        except Exception as e:
+            print(f"   [!] Không thể đưa terminal lên đầu: {e}")
+
+    def kill_smile(self):
+        """Kiểm tra và đóng SMILE nếu đang chạy để đảm bảo khởi động sạch"""
+        print("   --> Kiểm tra và đóng SMILE FO nếu đang chạy...")
+        try:
+            subprocess.run("taskkill /F /IM SMILEFO.exe /T", shell=True, capture_output=True)
+            time.sleep(2)
+        except Exception:
+            pass
 
     def find_google_drive_path(self):
         """Tự động tìm kiếm ổ đĩa hoặc thư mục Google Drive trên Windows"""
@@ -100,19 +135,22 @@ class autoBackupSMILE:
 
     def run(self):
         try:
+            # LOCK INPUT
+            self.set_input_lock(True)
+
             # STEP 0: KIỂM TRA ĐƯỜNG DẪN DRIVE VÀ REMOTE
             print("\n[Step 0] Kiểm tra kết nối folder Remote và Google Drive...")
             drive_path = self.find_google_drive_path()
             
             if not drive_path:
                 print("\n[!] LỖI: Không tìm thấy ứng dụng Google Drive hoặc thư mục 'SMILE BACKUP' trên máy.")
-                print("--> Vui lòng đảm bảo Google Drive Desktop đang chạy và đã ánh xạ ổ đĩa (thường là ổ G:).")
+                self.set_input_lock(False)
                 input("\nNhấn ENTER để thoát...")
                 return
 
             if not os.path.exists(SOURCE_DIR):
                 print(f"\n[!] LỖI: Không thể truy cập ổ mạng Remote: {SOURCE_DIR}")
-                print("--> Hãy kiểm tra lại kết nối mạng hoặc quyền truy cập vào thư mục chia sẻ.")
+                self.set_input_lock(False)
                 input("\nNhấn ENTER để thoát...")
                 return
 
@@ -121,6 +159,11 @@ class autoBackupSMILE:
 
             # STEP 1-5: SMILE FO
             print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
+            
+            # Đảm bảo SMILE được tắt trước khi chạy
+            self.kill_smile()
+            
+            print(f"   --> Khởi động SMILE FO: {SMILE_PATH}")
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
             
@@ -165,20 +208,32 @@ class autoBackupSMILE:
             time.sleep(3)
 
             # STEP 7: Đẩy lên Drive
+            self.focus_terminal()
             print("\n[Step 7] Đang đồng bộ file backup mới nhất lên Google Drive...")
             files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
             if files:
                 latest = max(files, key=os.path.getmtime)
-                self.copy_with_progress(latest, os.path.join(drive_path, os.path.basename(latest)))
+                
+                # Thêm hậu tố _BOT vào tên file
+                base, ext = os.path.splitext(os.path.basename(latest))
+                new_filename = f"{base}_BOT{ext}"
+                
+                self.copy_with_progress(latest, os.path.join(drive_path, new_filename))
             else:
                 print("   [-] Không thấy file backup tại remote.")
 
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
+            
+        except Exception as e:
+            print(f"!! Lỗi trong quá trình auto: {e}")
+        finally:
+            self.set_input_lock(False)
             input("\nNhấn ENTER để đóng cửa sổ...")
 
-        except Exception as e:
-            print(f"!! Lỗi: {e}")
-            input("\nNhấn ENTER để thoát...")
+if __name__ == "__main__":
+    bot = autoBackupSMILE()
+    bot.run()
+
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
