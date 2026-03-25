@@ -132,17 +132,25 @@ class autoBackupSMILE:
                 return False
         return False
 
+    def log_message(self, message):
+        """In ra màn hình và đồng thời ghi vào tệp backup_log.txt"""
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"[{now}] {message}"
+        print(message)
+        with open("backup_log.txt", "a", encoding="utf-8") as f:
+            f.write(log_entry + "\n")
+
     def run(self):
         try:
             self.show_warning_overlay()
-            print("\n[Step 0] Kiểm tra kết nối...")
+            self.log_message("\n[Step 0] Kiểm tra kết nối...")
             drive_path = self.find_google_drive_path()
             if not drive_path or not os.path.exists(SOURCE_DIR):
-                print("\n[!] LỖI: Không tìm thấy Drive hoặc Remote.")
+                self.log_message("[!] LỖI: Không tìm thấy Drive hoặc Remote.")
                 return
 
             # STEP 1: Khởi động SMILE
-            print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
+            self.log_message(f"--- BẮT ĐẦU QUY TRÌNH SMILE ---")
             self.kill_smile()
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
@@ -164,7 +172,7 @@ class autoBackupSMILE:
             main_window.set_focus()
 
             # More Options
-            print("   --> Click More Options")
+            self.log_message("   --> Click More Options")
             self.robust_click(main_window, MORE_OPTIONS_COORDS)
             time.sleep(3)
 
@@ -176,7 +184,7 @@ class autoBackupSMILE:
                 time.sleep(5)
 
             # Backup
-            print("   --> Click Backup Database")
+            self.log_message("   --> Click Backup Database")
             main_window = self.app.top_window()
             self.robust_click(main_window, BACKUP_DB_COORDS)
             time.sleep(2)
@@ -184,12 +192,12 @@ class autoBackupSMILE:
 
             # Chờ Backup
             wait_time = BACKUP_DURATION + 30
-            print(f"\n[Step 6] TỰ ĐỘNG: Đang đợi backup ({wait_time} giây)...")
+            self.log_message(f"[Step 6] TỰ ĐỘNG: Đang đợi backup ({wait_time} giây)...")
             for i in range(wait_time, 0, -1):
-                if i % 30 == 0: print(f"   --> Còn {i} giây...")
+                if i % 30 == 0: self.log_message(f"   --> Còn {i} giây...")
                 time.sleep(1)
             
-            print("   --> Click OK sau backup")
+            self.log_message("   --> Click OK sau backup")
             main_window = self.app.top_window()
             self.robust_click(main_window, OK_BTN_COORDS)
             time.sleep(2)
@@ -198,31 +206,29 @@ class autoBackupSMILE:
 
             # STEP 7: Đẩy lên Drive
             self.focus_terminal()
-            print("\n[Step 7] Đang đồng bộ file backup mới nhất lên Google Drive...")
+            self.log_message("[Step 7] Đang đồng bộ file backup mới nhất lên Google Drive...")
             files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
             if files:
                 latest = max(files, key=os.path.getmtime)
-                
-                # Thêm hậu tố _BOT vào tên file
                 base, ext = os.path.splitext(os.path.basename(latest))
                 new_filename = f"{base}_BOT{ext}"
-                
+                self.log_message(f"   --> Đang tải lên file: {new_filename}")
                 self.copy_with_progress(latest, os.path.join(drive_path, new_filename))
             else:
-                print("   [-] Không thấy file backup tại remote.")
+                self.log_message("   [-] Không thấy file backup tại remote.")
 
-            print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
+            self.log_message(f"[+] HOÀN TẤT BACKUP SMILE.")
             
             # Đóng SMILE sau khi hoàn tất quy trình
             self.kill_smile()
             
         except Exception as e:
-            print(f"!! Lỗi: {e}")
+            self.log_message(f"!! Lỗi: {e}")
             time.sleep(5) # Đợi 5s để xem lỗi nếu có trước khi tự đóng
         finally:
             self.hide_warning_overlay()
-            print("\n[!] Hệ thống sẽ tự động đóng toàn bộ Terminal trong 3 giây...")
-            time.sleep(3)
+            self.log_message("\n[!] Hệ thống sẽ tự động đóng toàn bộ Terminal trong 10 giây...")
+            time.sleep(10)
             # Lệnh đóng toàn bộ cửa sổ Command Prompt (Terminal)
             subprocess.run("taskkill /F /IM cmd.exe", shell=True)
 
