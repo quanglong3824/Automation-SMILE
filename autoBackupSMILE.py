@@ -15,7 +15,7 @@ SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
 USER = "IT"
 PASS = "123@123a"
 
-# TỌA ĐỘ VÀ THÔNG SỐ CỐ ĐỊNH
+# TỌA ĐỘ VÀ THÔNG SỐ CỐ ĐỊNH (Tọa độ tương đối trong cửa sổ SMILE)
 MORE_OPTIONS_COORDS = (759, 408)
 BACKUP_DB_COORDS = (800, 324)
 OK_BTN_COORDS = (662, 447)
@@ -35,16 +35,16 @@ class autoBackupSMILE:
         def create_overlay():
             self.overlay = tk.Tk()
             self.overlay.title("SMILE BACKUP WARNING")
-            # Thiết kế thanh thông báo
             width = self.overlay.winfo_screenwidth()
-            self.overlay.geometry(f"{width}x40+0+0")
-            self.overlay.overrideredirect(True) # Xóa thanh tiêu đề
-            self.overlay.attributes("-topmost", True) # Luôn trên cùng
+            # Đặt ở sát mép trên, cao 35px
+            self.overlay.geometry(f"{width}x35+0+0")
+            self.overlay.overrideredirect(True)
+            self.overlay.attributes("-topmost", True)
             self.overlay.configure(bg='red')
             
             label = tk.Label(self.overlay, 
-                            text="⚠️ HỆ THỐNG ĐANG TỰ ĐỘNG BACKUP SMILE - VUI LÒNG KHÔNG CHẠM VÀO CHUỘT/BÀN PHÍM ⚠️", 
-                            fg="white", bg="red", font=("Arial", 14, "bold"))
+                            text="⚠️ HỆ THỐNG ĐANG TỰ ĐỘNG BACKUP SMILE - VUI LÒNG KHÔNG THAO TÁC ⚠️", 
+                            fg="white", bg="red", font=("Arial", 12, "bold"))
             label.pack(expand=True)
             self.overlay.mainloop()
 
@@ -55,21 +55,35 @@ class autoBackupSMILE:
     def hide_warning_overlay(self):
         """Tắt thanh thông báo"""
         if self.overlay:
-            self.overlay.after(0, self.overlay.destroy)
-            print("   [OK] Đã tắt cảnh báo màn hình.")
+            try:
+                self.overlay.after(0, self.overlay.destroy)
+                print("   [OK] Đã tắt cảnh báo màn hình.")
+            except: pass
+
+    def robust_click(self, window, coords):
+        """Click chuột bằng cách gửi tin nhắn trực tiếp tới Handle cửa sổ (Không cần di chuyển chuột thật)"""
+        try:
+            # Sử dụng phương thức click() của pywinauto thay vì mouse.click()
+            # click() gửi WM_LBUTTONDOWN/UP, không yêu cầu active desktop như click_input()
+            window.click(coords=coords)
+        except Exception as e:
+            print(f"   [!] Lỗi khi click tại {coords}: {e}")
+            # Fallback nếu click() thất bại
+            try:
+                window.set_focus()
+                window.click_input(coords=coords)
+            except: pass
 
     def focus_terminal(self):
         """Đưa cửa sổ Terminal lên vị trí cao nhất (Topmost)"""
         try:
             hWnd = ctypes.windll.kernel32.GetConsoleWindow()
             if hWnd:
-                # SW_RESTORE = 9, HWND_TOPMOST = -1
-                ctypes.windll.user32.ShowWindow(hWnd, 9)
+                ctypes.windll.user32.ShowWindow(hWnd, 9) # SW_RESTORE
                 ctypes.windll.user32.SetForegroundWindow(hWnd)
                 ctypes.windll.user32.SetWindowPos(hWnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002) 
-                print("   --> Đã đưa Terminal lên trên cùng để theo dõi.")
-        except Exception as e:
-            print(f"   [!] Không thể đưa terminal lên đầu: {e}")
+                print("   --> Đã đưa Terminal lên trên cùng.")
+        except Exception: pass
 
     def kill_smile(self):
         """Kiểm tra và đóng SMILE nếu đang chạy để đảm bảo khởi động sạch"""
@@ -77,95 +91,68 @@ class autoBackupSMILE:
         try:
             subprocess.run("taskkill /F /IM SMILEFO.exe /T", shell=True, capture_output=True)
             time.sleep(2)
-        except Exception:
-            pass
+        except Exception: pass
 
     def find_google_drive_path(self):
         """Tự động tìm kiếm ổ đĩa hoặc thư mục Google Drive trên Windows"""
         if os.path.exists(r"G:\My Drive"):
             return r"G:\My Drive\SMILE BACKUP"
-        
         import string
         for letter in string.ascii_uppercase[7:]: # H to Z
             path = f"{letter}:\\My Drive"
             if os.path.exists(path):
                 return f"{letter}:\\My Drive\\SMILE BACKUP"
-        
         user_profile = os.environ.get("USERPROFILE")
         default_path = os.path.join(user_profile, "Google Drive", "My Drive", "SMILE BACKUP")
-        if os.path.exists(os.path.dirname(default_path)):
-            return default_path
-            
+        if os.path.exists(os.path.dirname(default_path)): return default_path
         return None
 
     def copy_with_progress(self, src, dst):
-        """Sao chép file kèm hiển thị tiến trình % và xử lý lỗi Permission"""
+        """Sao chép file kèm hiển thị tiến trình %"""
         MAX_RETRIES = 3
         RETRY_DELAY = 5
-        
         for attempt in range(MAX_RETRIES):
             try:
                 total_size = os.path.getsize(src)
                 copied = 0
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
-                
-                if os.path.exists(dst):
-                    try:
-                        with open(dst, 'ab') as f: pass
-                    except PermissionError:
-                        print(f"   [!] File đích đang bị khóa bởi ứng dụng khác (Drive sync?). Thử lại sau {RETRY_DELAY}s... ({attempt+1}/{MAX_RETRIES})")
-                        time.sleep(RETRY_DELAY)
-                        continue
-
                 with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-                    print(f"   --> Đang đẩy file: {os.path.basename(src)} ({total_size / (1024*1024):.2f} MB)")
+                    print(f"   --> Đang đẩy file: {os.path.basename(src)}")
                     while True:
                         chunk = fsrc.read(1024 * 1024)
                         if not chunk: break
                         fdst.write(chunk)
                         copied += len(chunk)
                         percent = (copied / total_size) * 100
-                        print(f"\r   [Đang tải lên Drive]: {percent:.1f}% [{'#' * int(percent // 5)}{'-' * (20 - int(percent // 5))}]", end="")
+                        print(f"\r   [Đang tải lên Drive]: {percent:.1f}%", end="")
                 print(f"\n   [OK] Đã hoàn tất đẩy file lên Drive.")
                 return True
-            except PermissionError as e:
-                if attempt < MAX_RETRIES - 1:
-                    print(f"\n   [!] Lỗi Permission (Error 13). Thử lại sau {RETRY_DELAY}s... ({attempt+1}/{MAX_RETRIES})")
-                    time.sleep(RETRY_DELAY)
-                else:
-                    print(f"\n   [x] Không thể ghi file. Lỗi: {e}")
-                    try:
-                        shutil.copy2(src, dst)
-                        return True
-                    except: return False
             except Exception as e:
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
                 return False
         return False
 
     def run(self):
         try:
-            # HIỂN THỊ CẢNH BÁO TRÊN MÀN HÌNH
             self.show_warning_overlay()
-
-            # STEP 0: KIỂM TRA ĐƯỜNG DẪN
-            print("\n[Step 0] Kiểm tra kết nối folder Remote và Google Drive...")
+            print("\n[Step 0] Kiểm tra kết nối...")
             drive_path = self.find_google_drive_path()
-            
             if not drive_path or not os.path.exists(SOURCE_DIR):
                 print("\n[!] LỖI: Không tìm thấy Drive hoặc Remote.")
                 return
 
-            print(f"   [OK] Đã kết nối Drive: {drive_path}")
-            print(f"   [OK] Đã kết nối Remote: {SOURCE_DIR}")
-
-            # STEP 1-5: SMILE FO
+            # STEP 1: Khởi động SMILE
             print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
             self.kill_smile()
-            
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
             
             # Login 1
+            main_window = self.app.top_window()
+            main_window.set_focus()
+            
             dlg = self.app.window(title_re=".*Log.*In.*")
             if dlg.exists():
                 dlg.set_focus()
@@ -174,11 +161,16 @@ class autoBackupSMILE:
             send_keys("{ESC}")
             time.sleep(3)
 
+            # Lấy cửa sổ chính sau khi Login
+            main_window = self.app.top_window()
+            main_window.set_focus()
+
             # More Options
-            mouse.click(button='left', coords=MORE_OPTIONS_COORDS)
+            print("   --> Click More Options")
+            self.robust_click(main_window, MORE_OPTIONS_COORDS)
             time.sleep(3)
 
-            # Login 2
+            # Login 2 (nếu có)
             top = self.app.top_window()
             if any(w in top.window_text() for w in ["Log", "Pass", "Mật khẩu"]):
                 top.set_focus()
@@ -186,7 +178,9 @@ class autoBackupSMILE:
                 time.sleep(5)
 
             # Backup
-            mouse.click(button='left', coords=BACKUP_DB_COORDS)
+            print("   --> Click Backup Database")
+            main_window = self.app.top_window()
+            self.robust_click(main_window, BACKUP_DB_COORDS)
             time.sleep(2)
             send_keys("{ENTER}")
 
@@ -197,7 +191,9 @@ class autoBackupSMILE:
                 if i % 30 == 0: print(f"   --> Còn {i} giây...")
                 time.sleep(1)
             
-            mouse.click(button='left', coords=OK_BTN_COORDS)
+            print("   --> Click OK sau backup")
+            main_window = self.app.top_window()
+            self.robust_click(main_window, OK_BTN_COORDS)
             time.sleep(2)
             send_keys("0") # Thoát
             time.sleep(3)
@@ -221,6 +217,11 @@ class autoBackupSMILE:
         finally:
             self.hide_warning_overlay()
             input("\nNhấn ENTER để đóng cửa sổ...")
+
+if __name__ == "__main__":
+    bot = autoBackupSMILE()
+    bot.run()
+
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
