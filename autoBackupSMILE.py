@@ -64,11 +64,9 @@ class autoBackupSMILE:
         """Click chuột bằng cách gửi tin nhắn trực tiếp tới Handle cửa sổ (Không cần di chuyển chuột thật)"""
         try:
             # Sử dụng phương thức click() của pywinauto thay vì mouse.click()
-            # click() gửi WM_LBUTTONDOWN/UP, không yêu cầu active desktop như click_input()
             window.click(coords=coords)
         except Exception as e:
             print(f"   [!] Lỗi khi click tại {coords}: {e}")
-            # Fallback nếu click() thất bại
             try:
                 window.set_focus()
                 window.click_input(coords=coords)
@@ -117,7 +115,7 @@ class autoBackupSMILE:
                 copied = 0
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-                    print(f"   --> Đang đẩy file: {os.path.basename(src)}")
+                    print(f"   --> Đang đẩy file: {os.path.basename(dst)}") # Hiển thị tên file đích (đã có _BOT)
                     while True:
                         chunk = fsrc.read(1024 * 1024)
                         if not chunk: break
@@ -204,8 +202,11 @@ class autoBackupSMILE:
             files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
             if files:
                 latest = max(files, key=os.path.getmtime)
+                
+                # Thêm hậu tố _BOT vào tên file
                 base, ext = os.path.splitext(os.path.basename(latest))
                 new_filename = f"{base}_BOT{ext}"
+                
                 self.copy_with_progress(latest, os.path.join(drive_path, new_filename))
             else:
                 print("   [-] Không thấy file backup tại remote.")
@@ -217,21 +218,6 @@ class autoBackupSMILE:
         finally:
             self.hide_warning_overlay()
             input("\nNhấn ENTER để đóng cửa sổ...")
-
-if __name__ == "__main__":
-    bot = autoBackupSMILE()
-    bot.run()
-
-
-if __name__ == "__main__":
-    bot = autoBackupSMILE()
-    bot.run()
-
-
-if __name__ == "__main__":
-    bot = autoBackupSMILE()
-    bot.run()
-
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
