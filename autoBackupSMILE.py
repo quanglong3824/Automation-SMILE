@@ -7,8 +7,11 @@ import tkinter as tk
 import ctypes
 import subprocess
 import threading
-from pywinauto import Application, mouse
+from pywinauto import Application, mouse, timings
 from pywinauto.keyboard import send_keys
+
+# Tối ưu hóa tốc độ phản hồi của pywinauto
+timings.Timings.fast()
 
 # ==================== CONFIG ====================
 SMILE_PATH = r"C:\Program Files (x86)\SMILE\SMILEFO.exe"
@@ -61,17 +64,16 @@ class autoBackupSMILE:
             except: pass
 
     def robust_click(self, window, coords):
-        """Click chuột bằng cách di chuyển chuột thật đến vị trí (Giúp người dùng quan sát được)"""
+        """Click chuột nhanh hơn (Giảm thời gian chờ)"""
         try:
-            self.log_message(f"   [Action] Đang click vào tọa độ {coords}...")
-            # Đảm bảo cửa sổ được đưa lên trên cùng trước khi click
+            self.log_message(f"   [Action] Click {coords}...")
             window.set_focus()
-            time.sleep(1)
-            # click_input sẽ di chuyển chuột thật đến vị trí và thực hiện click
+            # Giảm thời gian chờ xuống mức tối thiểu
+            time.sleep(0.3)
             window.click_input(coords=coords)
-            time.sleep(1)
+            time.sleep(0.5)
         except Exception as e:
-            self.log_message(f"   [!] Lỗi khi click tại {coords}: {e}")
+            self.log_message(f"   [!] Lỗi click {coords}: {e}")
             try:
                 window.click(coords=coords)
             except: pass
@@ -92,7 +94,7 @@ class autoBackupSMILE:
         print("   --> Kiểm tra và đóng SMILE FO nếu đang chạy...")
         try:
             subprocess.run("taskkill /F /IM SMILEFO.exe /T", shell=True, capture_output=True)
-            time.sleep(2)
+            time.sleep(1)
         except Exception: pass
 
     def find_google_drive_path(self):
@@ -157,7 +159,7 @@ class autoBackupSMILE:
             self.log_message(f"--- BẮT ĐẦU QUY TRÌNH SMILE ---")
             self.kill_smile()
             self.app = Application(backend="win32").start(SMILE_PATH)
-            time.sleep(10)
+            time.sleep(7)
             
             # Login 1
             main_window = self.app.top_window()
@@ -167,31 +169,28 @@ class autoBackupSMILE:
             if dlg.exists():
                 dlg.set_focus()
                 send_keys("^a{BACKSPACE}" + USER + "{TAB}" + PASS + "{ENTER}")
-                time.sleep(15)
+                time.sleep(10)
             send_keys("{ESC}")
-            time.sleep(3)
+            time.sleep(1)
 
             # Lấy cửa sổ chính sau khi Login
             main_window = self.app.top_window()
             main_window.set_focus()
 
             # More Options
-            self.log_message("   --> Click More Options")
             self.robust_click(main_window, MORE_OPTIONS_COORDS)
-            time.sleep(3)
+            time.sleep(1)
 
             # Login 2 (nếu có)
             top = self.app.top_window()
             if any(w in top.window_text() for w in ["Log", "Pass", "Mật khẩu"]):
                 top.set_focus()
                 send_keys(PASS + "{ENTER}")
-                time.sleep(5)
+                time.sleep(2)
 
             # Backup
-            self.log_message("   --> Click Backup Database")
-            main_window = self.app.top_window()
             self.robust_click(main_window, BACKUP_DB_COORDS)
-            time.sleep(2)
+            time.sleep(1)
             send_keys("{ENTER}")
 
             # Chờ Backup
@@ -204,9 +203,9 @@ class autoBackupSMILE:
             self.log_message("   --> Click OK sau backup")
             main_window = self.app.top_window()
             self.robust_click(main_window, OK_BTN_COORDS)
-            time.sleep(2)
+            time.sleep(1)
             send_keys("0") # Thoát
-            time.sleep(3)
+            time.sleep(1)
 
             # STEP 7: Đẩy lên Drive
             self.focus_terminal()
