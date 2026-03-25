@@ -6,6 +6,7 @@ import datetime
 import tkinter as tk
 import ctypes
 import subprocess
+import threading
 from pywinauto import Application, mouse
 from pywinauto.keyboard import send_keys
 
@@ -27,17 +28,35 @@ SOURCE_DIR = r"\\192.168.1.2\smile$"
 class autoBackupSMILE:
     def __init__(self):
         self.app = None
+        self.overlay = None
 
-    def set_input_lock(self, lock=True):
-        """Khóa hoặc mở khóa bàn phím và chuột (Yêu cầu quyền Administrator)"""
-        try:
-            ctypes.windll.user32.BlockInput(lock)
-            if lock:
-                print("   [!] ĐÃ KHÓA BÀN PHÍM VÀ CHUỘT. Vui lòng không chạm vào máy.")
-            else:
-                print("   [OK] Đã mở khóa bàn phím và chuột.")
-        except Exception:
-            print("   [!] Cảnh báo: Không thể khóa/mở khóa input (Cần chạy với quyền Administrator).")
+    def show_warning_overlay(self):
+        """Hiển thị thanh thông báo màu đỏ trên cùng màn hình"""
+        def create_overlay():
+            self.overlay = tk.Tk()
+            self.overlay.title("SMILE BACKUP WARNING")
+            # Thiết kế thanh thông báo
+            width = self.overlay.winfo_screenwidth()
+            self.overlay.geometry(f"{width}x40+0+0")
+            self.overlay.overrideredirect(True) # Xóa thanh tiêu đề
+            self.overlay.attributes("-topmost", True) # Luôn trên cùng
+            self.overlay.configure(bg='red')
+            
+            label = tk.Label(self.overlay, 
+                            text="⚠️ HỆ THỐNG ĐANG TỰ ĐỘNG BACKUP SMILE - VUI LÒNG KHÔNG CHẠM VÀO CHUỘT/BÀN PHÍM ⚠️", 
+                            fg="white", bg="red", font=("Arial", 14, "bold"))
+            label.pack(expand=True)
+            self.overlay.mainloop()
+
+        self.overlay_thread = threading.Thread(target=create_overlay, daemon=True)
+        self.overlay_thread.start()
+        print("   [!] Đang hiển thị cảnh báo trên màn hình.")
+
+    def hide_warning_overlay(self):
+        """Tắt thanh thông báo"""
+        if self.overlay:
+            self.overlay.after(0, self.overlay.destroy)
+            print("   [OK] Đã tắt cảnh báo màn hình.")
 
     def focus_terminal(self):
         """Đưa cửa sổ Terminal lên vị trí cao nhất (Topmost)"""
@@ -63,18 +82,15 @@ class autoBackupSMILE:
 
     def find_google_drive_path(self):
         """Tự động tìm kiếm ổ đĩa hoặc thư mục Google Drive trên Windows"""
-        # 1. Kiểm tra ổ đĩa G: (Mặc định của Google Drive Desktop)
         if os.path.exists(r"G:\My Drive"):
             return r"G:\My Drive\SMILE BACKUP"
         
-        # 2. Kiểm tra các ổ đĩa khác từ H-Z
         import string
         for letter in string.ascii_uppercase[7:]: # H to Z
             path = f"{letter}:\\My Drive"
             if os.path.exists(path):
                 return f"{letter}:\\My Drive\\SMILE BACKUP"
         
-        # 3. Kiểm tra trong thư mục User mặc định
         user_profile = os.environ.get("USERPROFILE")
         default_path = os.path.join(user_profile, "Google Drive", "My Drive", "SMILE BACKUP")
         if os.path.exists(os.path.dirname(default_path)):
@@ -93,7 +109,6 @@ class autoBackupSMILE:
                 copied = 0
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 
-                # Kiểm tra nếu file đích đã tồn tại và đang bị khóa (thường do Drive đang sync)
                 if os.path.exists(dst):
                     try:
                         with open(dst, 'ab') as f: pass
@@ -115,43 +130,29 @@ class autoBackupSMILE:
                 return True
             except PermissionError as e:
                 if attempt < MAX_RETRIES - 1:
-                    print(f"\n   [!] Lỗi Permission (Error 13). Có thể file đang bị lock. Thử lại sau {RETRY_DELAY}s... ({attempt+1}/{MAX_RETRIES})")
+                    print(f"\n   [!] Lỗi Permission (Error 13). Thử lại sau {RETRY_DELAY}s... ({attempt+1}/{MAX_RETRIES})")
                     time.sleep(RETRY_DELAY)
                 else:
-                    print(f"\n   [x] Không thể ghi file sau {MAX_RETRIES} lần thử. Lỗi: {e}")
-                    # Thử phương thức copy thay thế của shutil như phương án cuối cùng
+                    print(f"\n   [x] Không thể ghi file. Lỗi: {e}")
                     try:
-                        print("   --> Thử dùng phương thức shutil.copy2...")
                         shutil.copy2(src, dst)
-                        print("   [OK] Đã hoàn tất bằng shutil.copy2.")
                         return True
-                    except Exception as e2:
-                        print(f"   [x] Thất bại hoàn toàn: {e2}")
-                        return False
+                    except: return False
             except Exception as e:
-                print(f"\n   [x] Lỗi không xác định khi copy: {e}")
                 return False
         return False
 
     def run(self):
         try:
-            # LOCK INPUT
-            self.set_input_lock(True)
+            # HIỂN THỊ CẢNH BÁO TRÊN MÀN HÌNH
+            self.show_warning_overlay()
 
-            # STEP 0: KIỂM TRA ĐƯỜNG DẪN DRIVE VÀ REMOTE
+            # STEP 0: KIỂM TRA ĐƯỜNG DẪN
             print("\n[Step 0] Kiểm tra kết nối folder Remote và Google Drive...")
             drive_path = self.find_google_drive_path()
             
-            if not drive_path:
-                print("\n[!] LỖI: Không tìm thấy ứng dụng Google Drive hoặc thư mục 'SMILE BACKUP' trên máy.")
-                self.set_input_lock(False)
-                input("\nNhấn ENTER để thoát...")
-                return
-
-            if not os.path.exists(SOURCE_DIR):
-                print(f"\n[!] LỖI: Không thể truy cập ổ mạng Remote: {SOURCE_DIR}")
-                self.set_input_lock(False)
-                input("\nNhấn ENTER để thoát...")
+            if not drive_path or not os.path.exists(SOURCE_DIR):
+                print("\n[!] LỖI: Không tìm thấy Drive hoặc Remote.")
                 return
 
             print(f"   [OK] Đã kết nối Drive: {drive_path}")
@@ -159,11 +160,8 @@ class autoBackupSMILE:
 
             # STEP 1-5: SMILE FO
             print(f"\n--- BẮT ĐẦU QUY TRÌNH SMILE: {datetime.datetime.now()} ---")
-            
-            # Đảm bảo SMILE được tắt trước khi chạy
             self.kill_smile()
             
-            print(f"   --> Khởi động SMILE FO: {SMILE_PATH}")
             self.app = Application(backend="win32").start(SMILE_PATH)
             time.sleep(10)
             
@@ -177,7 +175,6 @@ class autoBackupSMILE:
             time.sleep(3)
 
             # More Options
-            print("   --> Click More Options")
             mouse.click(button='left', coords=MORE_OPTIONS_COORDS)
             time.sleep(3)
 
@@ -189,7 +186,6 @@ class autoBackupSMILE:
                 time.sleep(5)
 
             # Backup
-            print("   --> Click Backup Database")
             mouse.click(button='left', coords=BACKUP_DB_COORDS)
             time.sleep(2)
             send_keys("{ENTER}")
@@ -201,7 +197,6 @@ class autoBackupSMILE:
                 if i % 30 == 0: print(f"   --> Còn {i} giây...")
                 time.sleep(1)
             
-            print("   --> Click OK sau backup")
             mouse.click(button='left', coords=OK_BTN_COORDS)
             time.sleep(2)
             send_keys("0") # Thoát
@@ -213,11 +208,8 @@ class autoBackupSMILE:
             files = [os.path.join(SOURCE_DIR, f) for f in os.listdir(SOURCE_DIR) if os.path.isfile(os.path.join(SOURCE_DIR, f))]
             if files:
                 latest = max(files, key=os.path.getmtime)
-                
-                # Thêm hậu tố _BOT vào tên file
                 base, ext = os.path.splitext(os.path.basename(latest))
                 new_filename = f"{base}_BOT{ext}"
-                
                 self.copy_with_progress(latest, os.path.join(drive_path, new_filename))
             else:
                 print("   [-] Không thấy file backup tại remote.")
@@ -225,10 +217,15 @@ class autoBackupSMILE:
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
             
         except Exception as e:
-            print(f"!! Lỗi trong quá trình auto: {e}")
+            print(f"!! Lỗi: {e}")
         finally:
-            self.set_input_lock(False)
+            self.hide_warning_overlay()
             input("\nNhấn ENTER để đóng cửa sổ...")
+
+if __name__ == "__main__":
+    bot = autoBackupSMILE()
+    bot.run()
+
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
