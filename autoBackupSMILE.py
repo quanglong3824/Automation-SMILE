@@ -213,11 +213,18 @@ class autoBackupSMILE:
 
             print(f"\n[+] HOÀN TẤT: {datetime.datetime.now()}")
             
+            # Đóng SMILE sau khi hoàn tất quy trình
+            self.kill_smile()
+            
         except Exception as e:
             print(f"!! Lỗi: {e}")
+            time.sleep(5) # Đợi 5s để xem lỗi nếu có trước khi tự đóng
         finally:
             self.hide_warning_overlay()
-            input("\nNhấn ENTER để đóng cửa sổ...")
+            print("\n[!] Hệ thống sẽ tự động đóng toàn bộ Terminal trong 3 giây...")
+            time.sleep(3)
+            # Lệnh đóng toàn bộ cửa sổ Command Prompt (Terminal)
+            subprocess.run("taskkill /F /IM cmd.exe", shell=True)
 
 if __name__ == "__main__":
     bot = autoBackupSMILE()
