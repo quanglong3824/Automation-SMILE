@@ -61,15 +61,19 @@ class autoBackupSMILE:
             except: pass
 
     def robust_click(self, window, coords):
-        """Click chuột bằng cách gửi tin nhắn trực tiếp tới Handle cửa sổ (Không cần di chuyển chuột thật)"""
+        """Click chuột bằng cách di chuyển chuột thật đến vị trí (Giúp người dùng quan sát được)"""
         try:
-            # Sử dụng phương thức click() của pywinauto thay vì mouse.click()
-            window.click(coords=coords)
+            self.log_message(f"   [Action] Đang click vào tọa độ {coords}...")
+            # Đảm bảo cửa sổ được đưa lên trên cùng trước khi click
+            window.set_focus()
+            time.sleep(1)
+            # click_input sẽ di chuyển chuột thật đến vị trí và thực hiện click
+            window.click_input(coords=coords)
+            time.sleep(1)
         except Exception as e:
-            print(f"   [!] Lỗi khi click tại {coords}: {e}")
+            self.log_message(f"   [!] Lỗi khi click tại {coords}: {e}")
             try:
-                window.set_focus()
-                window.click_input(coords=coords)
+                window.click(coords=coords)
             except: pass
 
     def focus_terminal(self):
