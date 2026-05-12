@@ -1,0 +1,34 @@
+{
+    "SMILE_PATH": "C:\\Program Files (x86)\\SMILE\\SMILEFO.exe",
+    "USER": "IT",
+    "PASS": "123@123a",
+    "SOURCE_DIR": "\\\\192.168.1.2\\smile$",
+    "GOOGLE_DRIVE_PATHS": [
+        "G:\\My Drive"
+    ],
+    "GOOGLE_DRIVE_SUBFOLDER": "SMILE BACKUP",
+    "GOOGLE_DRIVE_PROFILE_PATH": "Google Drive\\My Drive\\SMILE BACKUP",
+    "MORE_OPTIONS_COORDS": [
+        759,
+        408
+    ],
+    "BACKUP_DB_COORDS": [
+        800,
+        324
+    ],
+    "OK_BTN_COORDS": [
+        662,
+        447
+    ],
+    "BACKUP_DURATION": 5,
+    "SMILE_STARTUP_WAIT": 7,
+    "LOGIN_WAIT": 10,
+    "BACKUP_OK_RETRIES": 5,
+    "BACKUP_OK_RETRY_DELAY": 3,
+    "CLICK_RETRIES": 3,
+    "CLICK_RETRY_DELAY": 2,
+    "WINDOW_GET_TIMEOUT": 20,
+    "WINDOW_GET_RETRY_INTERVAL": 3,
+    "SMILE_EXIT_KEY": "0",
+    "TERMINAL_CLOSE_DELAY": 10
+}
