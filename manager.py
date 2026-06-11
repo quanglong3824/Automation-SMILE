@@ -23,18 +23,18 @@ def load_config():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        print(f"[!] Khong tim thay file cau hinh: {CONFIG_FILE}")
-        input("Nhan Enter de thoat...")
+        print(f"[!] Không tìm thấy tệp cấu hình: {CONFIG_FILE}")
+        input("Nhấn Enter để thoát...")
         raise SystemExit(1)
     except json.JSONDecodeError as e:
-        print(f"[!] Loi doc file cau hinh: {e}")
-        input("Nhan Enter de thoat...")
+        print(f"[!] Lỗi đọc tệp cấu hình: {e}")
+        input("Nhấn Enter để thoát...")
         raise SystemExit(1)
 
 def save_config(cfg):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=4, ensure_ascii=False)
-    print("[OK] Da luu cau hinh vao config.json")
+    print("[OK] Đã lưu cấu hình vào config.json")
 
 # ==================== UTILITY ====================
 def clear_screen():
@@ -46,11 +46,11 @@ def print_header(title):
     print("=" * 60)
 
 def print_files_table(files_info):
-    """In bang file voi STT, ten, ngay, kich thuoc"""
+    """In bảng file với STT, tên tệp, ngày, kích thước"""
     if not files_info:
-        print("   (Khong co file nao)")
+        print("   (Không có tệp nào)")
         return
-    print(f"   {'STT':<5} {'Ngay backup':<25} {'Ten file':<40} {'Kich thuoc':<15}")
+    print(f"   {'STT':<5} {'Ngày sao lưu':<25} {'Tên tệp':<40} {'Kích thước':<15}")
     print(f"   {'-'*5} {'-'*25} {'-'*40} {'-'*15}")
     for i, info in enumerate(files_info, 1):
         print(f"   {i:<5} {info['date_str']:<25} {info['name']:<40} {info['size_str']:<15}")
@@ -83,7 +83,7 @@ def get_file_info(filepath):
         return None
 
 def get_files_in_dir(dir_path, pattern=None):
-    """Lay danh sach file trong thu muc, sap xep theo ngay moi nhat"""
+    """Lấy danh sách tệp trong thư mục, sắp xếp theo ngày mới nhất"""
     if not os.path.exists(dir_path):
         return []
     files = []
@@ -95,7 +95,7 @@ def get_files_in_dir(dir_path, pattern=None):
                 if info:
                     files.append(info)
     except Exception as e:
-        print(f"[!] Loi doc thu muc {dir_path}: {e}")
+        print(f"[!] Lỗi đọc thư mục {dir_path}: {e}")
     files.sort(key=lambda x: x['date'], reverse=True)
     return files
 
@@ -112,23 +112,23 @@ def get_unique_days(files_info):
     return sorted_days
 
 def browse_folder(start_path):
-    """Duyet thu muc va cho nguoi dung chon thu muc muc tieu.
-    Tra ve duong dan day du cua thu muc duoc chon, hoac None de huy."""
+    """Duyệt thư mục và cho người dùng chọn thư mục mục tiêu.
+    Trả về đường dẫn đầy đủ của thư mục được chọn, hoặc None để hủy."""
     current_path = start_path
     
     while True:
         clear_screen()
-        print_header("DUYET THU MUC")
-        print(f"\n   Dang tai: {current_path}\n")
+        print_header("DUYỆT THƯ MỤC")
+        print(f"\n   Đang tải: {current_path}\n")
 
-        # Liet ke cac thu muc con
+        # Liệt kê các thư mục con
         subfolders = []
         try:
             for item in sorted(os.listdir(current_path)):
                 item_path = os.path.join(current_path, item)
                 if os.path.isdir(item_path):
                     try:
-                        # Dem so file con trong thu muc
+                        # Đếm số file con trong thư mục
                         num_items = len([f for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f))])
                         subfolders.append({
                             'name': item,
@@ -142,66 +142,66 @@ def browse_folder(start_path):
                             'num_files': '?'
                         })
         except Exception as e:
-            print(f"   [!] Loi doc thu muc: {e}")
-            input("   Nhan Enter de quay lai...")
+            print(f"   [!] Lỗi đọc thư mục: {e}")
+            input("   Nhấn Enter để quay lại...")
             return None
 
-        # Hien thi danh sach
-        print(f"   {'STT':<5} {'Ten thu muc':<45} {'So file':<10}")
+        # Hiển thị danh sách
+        print(f"   {'STT':<5} {'Tên thư mục':<45} {'Số tệp':<10}")
         print(f"   {'-'*5} {'-'*45} {'-'*10}")
         
-        # Tuy chon di len thu muc cha
+        # Tùy chọn đi lên thư mục cha
         parent = os.path.dirname(current_path)
         can_go_up = parent and parent != current_path and len(parent) >= len(start_path.split("\\")[0] + "\\")
         if can_go_up:
-            print(f"   {'0':<5} {'.. (Thu muc cha)':<45}")
+            print(f"   {'0':<5} {'.. (Thư mục cha)':<45}")
         
         for i, sf in enumerate(subfolders, 1):
             files_str = str(sf['num_files']) if sf['num_files'] != 0 else "-"
             print(f"   {i:<5} {sf['name']:<45} {files_str:<10}")
 
         if not subfolders:
-            print("   (Khong co thu muc con nao)")
+            print("   (Không có thư mục con nào)")
 
         print()
-        print("   Tuy chon:")
-        print(f"   - Nhap STT (1-{len(subfolders)}) de vao thu muc con")
+        print("   Tùy chọn:")
+        print(f"   - Nhập STT (1-{len(subfolders)}) để vào thư mục con")
         if can_go_up:
-            print("   - Nhap '0' de quay ve thu muc cha")
-        print("   - Nhap 'S' de chon thu muc hien tai lam noi luu backup")
-        print("   - Nhap 'C' de nhap ten thu muc moi (tao thu muc moi)")
-        print("   - Nhap 'X' de huy")
+            print("   - Nhập '0' để quay về thư mục cha")
+        print("   - Nhập 'S' để chọn thư mục hiện tại làm nơi lưu sao lưu")
+        print("   - Nhập 'C' để tạo thư mục mới")
+        print("   - Nhập 'X' để hủy")
 
-        choice = input("\n   Lua chon: ").strip()
+        choice = input("\n   Lựa chọn: ").strip()
 
         if choice.lower() == 'x':
             return None
 
         if choice.lower() == 's':
-            # Chon thu muc hien tai
+            # Chọn thư mục hiện tại
             return current_path
 
         if choice.lower() == 'c':
-            # Tao thu muc moi
-            new_name = input("   Nhap ten thu muc moi: ").strip()
+            # Tạo thư mục mới
+            new_name = input("   Nhập tên thư mục mới: ").strip()
             if not new_name:
-                print("   [!] Ten khong duoc de trong.")
+                print("   [!] Tên không được để trống.")
                 continue
-            # Loai bo ky tu khong hop le
+            # Loại bỏ ký tự không hợp lệ
             new_name = new_name.replace('/', '_').replace('\\', '_').replace(':', '_').replace('"', '_')
             new_path = os.path.join(current_path, new_name)
             if os.path.exists(new_path):
-                print(f"   [!] Thu muc '{new_name}' da ton tai.")
-                # Hoi co muon vao thu muc do khong
-                if confirm(f"   Vao thu muc '{new_name}'? (Y/N): "):
+                print(f"   [!] Thư mục '{new_name}' đã tồn tại.")
+                # Hỏi có muốn vào thư mục đó không
+                if confirm(f"   Vào thư mục '{new_name}'? (Y/N): "):
                     current_path = new_path
                 continue
             try:
                 os.makedirs(new_path, exist_ok=True)
-                print(f"   [OK] Da tao thu muc: {new_path}")
+                print(f"   [OK] Đã tạo thư mục: {new_path}")
                 current_path = new_path
             except Exception as e:
-                print(f"   [!] Loi tao thu muc: {e}")
+                print(f"   [!] Lỗi tạo thư mục: {e}")
             continue
 
         if choice == '0' and can_go_up:
@@ -211,16 +211,16 @@ def browse_folder(start_path):
         try:
             idx = int(choice)
             if idx < 1 or idx > len(subfolders):
-                print(f"   [!] STT khong hop le. Chon tu 1 den {len(subfolders)}")
-                input("   Nhan Enter de tiep tuc...")
+                print(f"   [!] STT không hợp lệ. Chọn từ 1 đến {len(subfolders)}")
+                input("   Nhấn Enter để tiếp tục...")
                 continue
             current_path = subfolders[idx - 1]['path']
         except ValueError:
-            print("   [!] Nhap khong hop le.")
-            input("   Nhan Enter de tiep tuc...")
+            print("   [!] Nhập không hợp lệ.")
+            input("   Nhấn Enter để tiếp tục...")
 
 def input_int(prompt, min_val=None, max_val=None):
-    """Nhap so nguyen voi kiem tra"""
+    """Nhập số nguyên có kiểm tra"""
     while True:
         try:
             val = input(prompt).strip()
@@ -228,232 +228,101 @@ def input_int(prompt, min_val=None, max_val=None):
                 return None
             val = int(val)
             if min_val is not None and val < min_val:
-                print(f"   [!] Gia tri phai >= {min_val}")
+                print(f"   [!] Giá trị phải >= {min_val}")
                 continue
             if max_val is not None and val > max_val:
-                print(f"   [!] Gia tri phai <= {max_val}")
+                print(f"   [!] Giá trị phải <= {max_val}")
                 continue
             return val
         except ValueError:
-            print("   [!] Vui long nhap so nguyen.")
+            print("   [!] Vui lòng nhập số nguyên.")
 
 def confirm(prompt):
-    """Xac nhan yes/no"""
+    """Xác nhận Có/Không (Yes/No)"""
     while True:
         val = input(prompt).strip().lower()
-        if val in ['y', 'yes', 'co']:
+        if val in ['y', 'yes', 'co', 'c']:
             return True
-        if val in ['n', 'no', 'khong']:
+        if val in ['n', 'no', 'khong', 'k']:
             return False
-        print("   [!] Vui long nhap Y/N.")
-
-# ==================== ENVIRONMENT CHECK & AUTO INSTALL ====================
-def check_environment():
-    """Kiem tra moi truong va bao cao"""
-    # Import setup_env tu cung thu muc
-    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
-    if not os.path.exists(setup_env_path):
-        print(f"\n   [!] Khong tim thay file setup_env.py tai: {setup_env_path}")
-        input("   Nhan Enter de quay lai...")
-        return
-
-    # Them SCRIPT_DIR vao sys.path tam thoi
-    if SCRIPT_DIR not in sys.path:
-        sys.path.insert(0, SCRIPT_DIR)
-
-    try:
-        import setup_env
-        # Goi ham kiem tra moi truong
-        results = setup_env.full_environment_check()
-        all_ok = setup_env.print_environment_report(results)
-
-        if not all_ok:
-            missing = setup_env.get_missing_critical_packages()
-            print(f"   Cac thu vien con thieu: {', '.join(p['package'] for p in missing)}")
-            answer = input("\n   Ban co muon tu dong cai dat? (Y/N): ").strip().lower()
-            if answer in ['y', 'yes', 'co']:
-                success, failed = setup_env.auto_install_missing(
-                    progress_callback=lambda msg: print(f"   {msg}")
-                )
-                print(f"\n   Da cai dat: {success} thu vien")
-                if failed:
-                    print(f"   That bai: {', '.join(p['package'] for p in failed)}")
-                    print("   Vui long cai dat thu cong bang lenh:")
-                    for p in failed:
-                        print(f"     pip install {p['package']}")
-                else:
-                    print("   [OK] Tat ca da san sang!")
-                input("\n   Nhan Enter de quay lai...")
-        else:
-            input("\n   Nhan Enter de quay lai...")
-    except Exception as e:
-        print(f"\n   [!] Loi kiem tra moi truong: {e}")
-        import traceback
-        traceback.print_exc()
-        input("\n   Nhan Enter de quay lai...")
+        print("   [!] Vui lòng nhập Y/N hoặc C/K.")
 
 def run_auto_backup():
-    """Chay auto backup SMILE"""
+    """Chạy tự động sao lưu SMILE"""
     clear_screen()
-    print_header("CHAY TU DONG BACKUP SMILE")
-
-    # Kiem tra moi truong truoc khi chay
-    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
-    if os.path.exists(setup_env_path):
-        if SCRIPT_DIR not in sys.path:
-            sys.path.insert(0, SCRIPT_DIR)
-        try:
-            import setup_env
-            missing = setup_env.get_missing_critical_packages()
-            if missing:
-                print(f"\n   [!] THIEU THU VIEN! Cac thu vien sau chua duoc cai dat:")
-                for p in missing:
-                    print(f"       - {p['package']} ({p['description']})")
-                print(f"\n   Vui long chon menu '7' de kiem tra va cai dat moi truong truoc.")
-                input("\n   Nhan Enter de quay lai...")
-                return
-        except Exception:
-            pass  # Neu khong import duoc, tiep tuc chay binh thuong
+    print_header("CHẠY TỰ ĐỘNG SAO LƯU SMILE")
 
     auto_script = os.path.join(SCRIPT_DIR, "autoBackupSMILE.py")
     if not os.path.exists(auto_script):
-        print(f"\n   [!] Khong tim thay file: {auto_script}")
-        input("   Nhan Enter de quay lai...")
+        print(f"\n   [!] Không tìm thấy tệp: {auto_script}")
+        input("   Nhấn Enter để quay lại...")
         return
 
-    print(f"\n   Script: {auto_script}")
-    print(f"   Dang khoi dong tu dong backup SMILE...")
-    print(f"   (Nhan Ctrl+C de dung lai neu can)")
+    print(f"\n   Kịch bản: {auto_script}")
+    print(f"   Đang khởi động tiến trình tự động sao lưu SMILE...")
+    print(f"   (Nhấn Ctrl+C để dừng lại nếu cần)")
     print()
 
-    # Kiem tra xem dang chay tu EXE (PyInstaller) hay Python source
+    # Kiểm tra xem đang chạy từ EXE (PyInstaller) hay Python source
     is_frozen = getattr(sys, 'frozen', False)
 
     try:
         if is_frozen:
-            # Chay tu EXE - import autoBackupSMILE nhu module
+            # Chạy từ EXE - import autoBackupSMILE như module
             if SCRIPT_DIR not in sys.path:
                 sys.path.insert(0, SCRIPT_DIR)
             import importlib
             auto_module = importlib.import_module("autoBackupSMILE")
             bot = auto_module.autoBackupSMILE()
             bot.run()
-            print(f"\n   [OK] Auto backup da hoan thanh thanh cong!")
+            print(f"\n   [OK] Tự động sao lưu đã hoàn tất thành công!")
         else:
-            # Chay tu Python source - dung subprocess de bao ly do rieng
+            # Chạy từ Python source - dùng subprocess
             result = subprocess.run(
                 [sys.executable, auto_script],
                 cwd=SCRIPT_DIR,
                 timeout=None
             )
             if result.returncode == 0:
-                print(f"\n   [OK] Auto backup da hoan thanh thanh cong!")
+                print(f"\n   [OK] Tự động sao lưu đã hoàn tất thành công!")
             else:
-                print(f"\n   [!] Auto backup da thoat voi ma: {result.returncode}")
+                print(f"\n   [!] Tiến trình sao lưu kết thúc với mã thoát: {result.returncode}")
     except KeyboardInterrupt:
-        print("\n   [!] Da dung lai boi nguoi dung.")
+        print("\n   [!] Đã dừng lại bởi người dùng.")
     except SystemExit:
-        print("\n   [!] Script da thoat.")
+        print("\n   [!] Kịch bản đã thoát.")
     except Exception as e:
-        print(f"\n   [!] Loi khi chay auto backup: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"\n   [!] Đã xảy ra lỗi khi chạy tự động sao lưu: {e}")
 
-    input("\n   Nhan Enter de quay lai menu...")
+    input("\n   Nhấn Enter để quay lại menu...")
 
-def full_environment_check_and_fix():
-    """Kiem tra moi truong day du va tu dong cai dat neu can"""
-    clear_screen()
-    print_header("KIEM TRA & CAI DAT MOI TRUONG")
-    print()
-    print("   Dang kiem tra moi truong...")
-    print()
 
-    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
-    if not os.path.exists(setup_env_path):
-        print(f"   [!] Khong tim thay file setup_env.py tai: {setup_env_path}")
-        input("   Nhan Enter de quay lai...")
-        return
-
-    if SCRIPT_DIR not in sys.path:
-        sys.path.insert(0, SCRIPT_DIR)
-
-    try:
-        import setup_env
-        results = setup_env.full_environment_check()
-        all_ok = setup_env.print_environment_report(results)
-
-        if not all_ok:
-            missing = setup_env.get_missing_critical_packages()
-            print(f"   Cac thu vien con thieu:")
-            for p in missing:
-                print(f"     - {p['package']}: {p['description']} (cho {p['required_by']})")
-
-            print(f"\n   Ban co muon tu dong cai dat tat ca thu vien con thieu? (Y/N)")
-            answer = input("   Lua chon: ").strip().lower()
-
-            if answer in ['y', 'yes', 'co']:
-                print()
-                success, failed = setup_env.auto_install_missing(
-                    progress_callback=lambda msg: print(f"   {msg}")
-                )
-
-                print(f"\n   {'='*50}")
-                print(f"   Ket qua cai dat:")
-                print(f"   - Thanh cong: {success} thu vien")
-                if failed:
-                    print(f"   - That bai: {len(failed)} thu vien")
-                    for p in failed:
-                        print(f"     X {p['package']}: {p['description']}")
-                    print(f"\n   Cai dat thu cong bang lenh:")
-                    for p in failed:
-                        print(f"     pip install {p['package']}")
-                else:
-                    print(f"   [OK] Tat ca thu vien da duoc cai dat thanh cong!")
-                print(f"   {'='*50}")
-
-                # Kiem tra lai sau khi cai dat
-                print(f"\n   Dang kiem tra lai moi truong...")
-                results2 = setup_env.full_environment_check()
-                all_ok2 = setup_env.print_environment_report(results2)
-
-                if all_ok2:
-                    print("\n   [OK] MOI TRUONG DA SAN SANG! Ban co the chay auto backup.")
-                else:
-                    print("\n   [!] Van con loi. Vui long kiem tra thu cong.")
-            else:
-                print("\n   [!] Da huy cai dat. Mot so chuc nang co the khong hoat dong.")
-        else:
-            print("\n   [OK] MOI TRUONG SAN SANG! Tat ca thu vien da du day du.")
-            print("   Ban co the chay auto backup binh thuong.")
-
-        input("\n   Nhan Enter de quay lai menu...")
-    except Exception as e:
-        print(f"\n   [!] Loi kiem tra moi truong: {e}")
-        import traceback
-        traceback.print_exc()
-        input("\n   Nhan Enter de quay lai...")
 
 # ==================== FEATURE 1: CAP NHAT GOOGLE DRIVE ====================
 def update_google_drive():
-    """Quet tat ca o dia, liet ke va cho nguoi dung chon hoac tao thu muc moi"""
+    """Quét tất cả ổ đĩa, liệt kê và cho người dùng chọn hoặc tạo thư mục mới"""
     clear_screen()
-    print_header("CAP NHAT DUONG DAN GOOGLE DRIVE")
+    print_header("CẬP NHẬT ĐƯỜNG DẪN GOOGLE DRIVE")
 
     while True:
-        print("\n   Dang quet cac o dia...")
+        # Đọc cấu hình hiện tại trước tiên
+        cfg = load_config()
+        current_paths = cfg.get("GOOGLE_DRIVE_PATHS", [])
+        current_subfolder = cfg.get("GOOGLE_DRIVE_SUBFOLDER", "SMILE BACKUP")
+
+        print("\n   Đang quét các ổ đĩa...")
         print()
 
         found_drives = []
         other_drives = []
 
-        # Quet cac o dia tu A-Z
+        # Quét các ổ đĩa từ A-Z
         for letter in string.ascii_uppercase:
             drive_root = f"{letter}:\\"
             if not os.path.exists(drive_root):
                 continue
 
-            # Lay ten o dia
+            # Lấy tên ổ đĩa
             try:
                 volume_name = subprocess.run(f'vol {letter}:', shell=True, capture_output=True, text=True).stdout.strip()
             except:
@@ -461,9 +330,23 @@ def update_google_drive():
 
             my_drive = os.path.join(drive_root, "My Drive")
             if os.path.exists(my_drive):
-                # La Google Drive
-                smile_backup = os.path.join(my_drive, "SMILE BACKUP")
-                is_existing = os.path.exists(smile_backup)
+                # Là Google Drive
+                # Tìm xem có thư mục nào chứa chữ "backup" (không phân biệt hoa thường) không
+                is_existing = False
+                found_backup_folder = current_subfolder
+                try:
+                    for f in os.listdir(my_drive):
+                        if os.path.isdir(os.path.join(my_drive, f)) and "backup" in f.lower():
+                            is_existing = True
+                            found_backup_folder = f
+                            break
+                except:
+                    pass
+
+                smile_backup = os.path.join(my_drive, found_backup_folder)
+                if not is_existing:
+                    is_existing = os.path.exists(smile_backup)
+
                 found_drives.append({
                     'letter': letter,
                     'drive_root': drive_root,
@@ -474,108 +357,117 @@ def update_google_drive():
                     'label': f"Google Drive ({letter}:)"
                 })
             else:
-                # O dia thuong - co the dung lam noi luu backup
+                # Ổ đĩa thường - có thể dùng làm nơi lưu sao lưu
                 other_drives.append({
                     'letter': letter,
                     'drive_root': drive_root,
                     'is_google_drive': False,
-                    'label': f"O dia {letter}:"
+                    'label': f"Ổ đĩa {letter}:"
                 })
 
-        # Kiem tra USERPROFILE
+        # Kiểm tra USERPROFILE
         user_profile = os.environ.get("USERPROFILE")
         if user_profile:
             profile_drive = os.path.join(user_profile, "Google Drive", "My Drive")
             if os.path.exists(profile_drive):
-                smile_backup = os.path.join(profile_drive, "SMILE BACKUP")
+                # Tìm xem có thư mục nào chứa chữ "backup" (không phân biệt hoa thường) không
+                is_existing = False
+                found_backup_folder = current_subfolder
+                try:
+                    for f in os.listdir(profile_drive):
+                        if os.path.isdir(os.path.join(profile_drive, f)) and "backup" in f.lower():
+                            is_existing = True
+                            found_backup_folder = f
+                            break
+                except:
+                    pass
+
+                smile_backup = os.path.join(profile_drive, found_backup_folder)
+                if not is_existing:
+                    is_existing = os.path.exists(smile_backup)
+
                 found_drives.append({
                     'letter': 'U',
                     'drive_root': os.path.join(user_profile, "Google Drive"),
                     'my_drive': profile_drive,
                     'smile_backup': smile_backup,
-                    'is_existing': os.path.exists(smile_backup),
+                    'is_existing': is_existing,
                     'is_google_drive': True,
                     'label': "Google Drive (User Profile)"
                 })
 
-        # Doc config hien tai
-        cfg = load_config()
-        current_paths = cfg.get("GOOGLE_DRIVE_PATHS", [])
-        current_subfolder = cfg.get("GOOGLE_DRIVE_SUBFOLDER", "SMILE BACKUP")
-
-        print(f"   --- Duong dan hien tai trong config ---")
+        print(f"   --- Đường dẫn hiện tại trong cấu hình ---")
         for i, p in enumerate(current_paths, 1):
             print(f"   {i}. {p}")
-        print(f"   Thu muc con: {current_subfolder}")
+        print(f"   Thư mục con: {current_subfolder}")
         print()
 
-        # Hien thi danh sach Google Drive phat hien duoc
+        # Hiển thị danh sách Google Drive phát hiện được
         if found_drives:
-            print(f"   === Google Drive phat hien duoc ===")
-            print(f"   {'STT':<5} {'Nhan':<25} {'Duong dan':<50} {'SMILE BACKUP?':<15}")
+            print(f"   === Google Drive phát hiện được ===")
+            print(f"   {'STT':<5} {'Nhãn':<25} {'Đường dẫn':<50} {'THƯ MỤC BACKUP?':<15}")
             print(f"   {'-'*5} {'-'*25} {'-'*50} {'-'*15}")
             for i, d in enumerate(found_drives, 1):
-                existing_str = "CO" if d['is_existing'] else "CHUA CO"
+                existing_str = "CÓ" if d['is_existing'] else "CHƯA CÓ"
                 print(f"   {i:<5} {d['label']:<25} {d['my_drive']:<50} {existing_str:<15}")
             print()
 
-        # Hien thi danh sach o dia khac
+        # Hiển thị danh sách ổ đĩa khác
         if other_drives:
-            print(f"   === O dia khac (co the dung luu backup) ===")
-            print(f"   {'STT':<5} {'Nhan':<25} {'Duong dan':<50}")
+            print(f"   === Ổ đĩa khác (có thể dùng lưu sao lưu) ===")
+            print(f"   {'STT':<5} {'Nhãn':<25} {'Đường dẫn':<50}")
             print(f"   {'-'*5} {'-'*25} {'-'*50}")
             for i, d in enumerate(other_drives, len(found_drives) + 1):
                 print(f"   {i:<5} {d['label']:<25} {d['drive_root']:<50}")
             print()
 
-        print("   Tuy chon:")
-        print(f"   - Nhap STT (1-{len(found_drives) + len(other_drives)}) de chon o dia")
-        print(f"   - Nhap 'N' de nhap duong dan thu cong") 
-        print(f"   - Nhap '0' de quay lai menu")
+        print("   Tùy chọn:")
+        print(f"   - Nhập STT (1-{len(found_drives) + len(other_drives)}) để chọn ổ đĩa")
+        print(f"   - Nhập 'N' để nhập đường dẫn thủ công") 
+        print(f"   - Nhập '0' để quay lại menu")
         print()
 
-        choice = input("   Lua chon: ").strip()
+        choice = input("   Lựa chọn: ").strip()
 
         if choice == '0':
             return
 
         if choice.lower() == 'n':
-            # Nhap duong dan thu cong
-            print("\n   Nhap duong dan day du den thu muc muon luu backup")
-            print("   Vi du: D:\\Backup\\SMILE_BACKUP hoac \\\\SERVER\\share\\backup")
-            print("   (Thu muc SMILE BACKUP se duoc tao tu dong neu chua co)")
-            custom_path = input("\n   Duong dan: ").strip().strip('"').strip("'")
+            # Nhập đường dẫn thủ công
+            print("\n   Nhập đường dẫn đầy đủ đến thư mục muốn lưu sao lưu")
+            print("   Ví dụ: D:\\Backup\\SMILE_BACKUP hoặc \\\\SERVER\\share\\backup")
+            print("   (Thư mục SMILE BACKUP sẽ được tạo tự động nếu chưa có)")
+            custom_path = input("\n   Đường dẫn: ").strip().strip('"').strip("'")
 
             if not custom_path:
-                print("   [!] Duong dan khong duoc de trong.")
+                print("   [!] Đường dẫn không được để trống.")
                 continue
 
-            # Kiem tra duong dan co ton tai thu muc cha khong
+            # Kiểm tra đường dẫn có tồn tại thư mục cha không
             parent_dir = custom_path
             if not os.path.exists(parent_dir):
-                # Thu tao thu muc cha
+                # Thử tạo thư mục cha
                 try:
                     os.makedirs(parent_dir, exist_ok=True)
-                    print(f"   [OK] Da tao thu muc: {parent_dir}")
+                    print(f"   [OK] Đã tạo thư mục: {parent_dir}")
                 except Exception as e:
-                    print(f"   [!] Khong the tao thu muc: {e}")
-                    input("   Nhan Enter de thu lai...")
+                    print(f"   [!] Không thể tạo thư mục: {e}")
+                    input("   Nhấn Enter để thử lại...")
                     continue
 
-            # Kiem tra/tao thu muc SMILE BACKUP
+            # Kiểm tra/tạo thư mục SMILE BACKUP
             smile_dir = os.path.join(parent_dir, current_subfolder) if current_subfolder in parent_dir else os.path.join(parent_dir, "SMILE BACKUP") if "SMILE BACKUP" not in custom_path else custom_path
             if not os.path.exists(smile_dir) and "SMILE BACKUP" not in custom_path:
-                if confirm(f"   Tao thu muc '{smile_dir}'? (Y/N): "):
+                if confirm(f"   Tạo thư mục '{smile_dir}'? (Y/N): "):
                     try:
                         os.makedirs(smile_dir, exist_ok=True)
-                        print(f"   [OK] Da tao thu muc: {smile_dir}")
+                        print(f"   [OK] Đã tạo thư mục: {smile_dir}")
                     except Exception as e:
-                        print(f"   [!] Loi tao thu muc: {e}")
-                        input("   Nhan Enter de thu lai...")
+                        print(f"   [!] Lỗi tạo thư mục: {e}")
+                        input("   Nhấn Enter để thử lại...")
                         continue
 
-            # Cap nhat config
-            # Su dung custom_path lam base, them SMILE BACKUP vao
+            # Cập nhật cấu hình
             if "SMILE BACKUP" in custom_path or current_subfolder in custom_path:
                 base_path = custom_path
                 final_path = custom_path
@@ -585,47 +477,43 @@ def update_google_drive():
 
             cfg["GOOGLE_DRIVE_PATHS"] = [base_path]
             save_config(cfg)
-            print(f"\n   [OK] Da cap nhat duong dan: {base_path}")
-            print(f"   [OK] Thu muc backup: {final_path}")
-            input("   Nhan Enter de quay lai...")
+            print(f"\n   [OK] Đã cập nhật đường dẫn: {base_path}")
+            print(f"   [OK] Thư mục sao lưu: {final_path}")
+            input("   Nhấn Enter để quay lại...")
             return
 
-        # Chon STT
+        # Chọn STT
         try:
             idx = int(choice)
             total_drives = found_drives + other_drives
             if idx < 1 or idx > len(total_drives):
-                print(f"   [!] STT khong hop le. Chon tu 1 den {len(total_drives)}")
-                input("   Nhan Enter de thu lai...")
+                print(f"   [!] STT không hợp lệ. Chọn từ 1 đến {len(total_drives)}")
+                input("   Nhấn Enter để thử lại...")
                 continue
 
             selected = total_drives[idx - 1]
 
             if selected['is_google_drive']:
-                # La Google Drive - mo duyet thu muc ben trong
+                # Là Google Drive - mở duyệt thư mục bên trong
                 start_browse = selected['my_drive']
-                print(f"\n   Mo duyet thu muc trong {selected['label']}...")
-                print(f"   Hay chon hoac tao thu muc de luu backup.")
-                input("   Nhan Enter de bat dau duyet...")
+                print(f"\n   Mở duyệt thư mục trong {selected['label']}...")
+                print(f"   Hãy chọn hoặc tạo thư mục để lưu sao lưu.")
+                input("   Nhấn Enter để bắt đầu duyệt...")
 
                 chosen = browse_folder(start_browse)
                 if chosen is None:
-                    print("   [!] Da huy chon thu muc.")
-                    input("   Nhan Enter de thu lai...")
+                    print("   [!] Đã hủy chọn thư mục.")
+                    input("   Nhấn Enter để thử lại...")
                     continue
 
-                # Tinh toan base_path va subfolder tu duong dan da chon
+                # Tính toán base_path và subfolder từ đường dẫn đã chọn
                 my_drive = selected['my_drive']
                 if chosen == my_drive:
-                    # Chon chinh My Drive - dung subfolder mac dinh
+                    # Chọn chính My Drive - dùng subfolder mặc định
                     cfg["GOOGLE_DRIVE_PATHS"] = [my_drive]
                     final_path = os.path.join(my_drive, current_subfolder)
                 else:
-                    # Chon thu muc con - tính relative path
-                    rel = os.path.relpath(chosen, os.path.dirname(my_drive))
-                    # Tach base va subfolder
-                    # Vi du: chosen = G:\My Drive\SMILE BACKUP → base = G:\My Drive, subfolder = SMILE BACKUP
-                    # Vi du: chosen = G:\My Drive\Work\Backups → base = G:\My Drive, subfolder = Work\Backups
+                    # Chọn thư mục con
                     try:
                         subfolder_rel = os.path.relpath(chosen, my_drive)
                         if subfolder_rel == '.':
@@ -637,39 +525,38 @@ def update_google_drive():
                         cfg["GOOGLE_DRIVE_PATHS"] = [chosen]
                         final_path = chosen
 
-                # Kiem tra/tao thu muc SMILE BACKUP neu can
+                # Kiểm tra/tạo thư mục nếu cần
                 if not os.path.exists(final_path):
-                    if confirm(f"   Tao thu muc '{final_path}'? (Y/N): "):
+                    if confirm(f"   Tạo thư mục '{final_path}'? (Y/N): "):
                         try:
                             os.makedirs(final_path, exist_ok=True)
-                            print(f"   [OK] Da tao thu muc: {final_path}")
+                            print(f"   [OK] Đã tạo thư mục: {final_path}")
                         except Exception as e:
-                            print(f"   [!] Loi tao thu muc: {e}")
-                            input("   Nhan Enter de thu lai...")
+                            print(f"   [!] Lỗi tạo thư mục: {e}")
+                            input("   Nhấn Enter để thử lại...")
                             continue
 
                 save_config(cfg)
-                print(f"\n   [OK] Da cap nhat duong dan Google Drive!")
-                print(f"   [OK] Thu muc backup: {final_path}")
-                input("   Nhan Enter de quay lai...")
+                print(f"\n   [OK] Đã cập nhật đường dẫn Google Drive!")
+                print(f"   [OK] Thư mục sao lưu: {final_path}")
+                input("   Nhấn Enter để quay lại...")
                 return
             else:
-                # La o dia thuong - mo duyet thu muc
+                # Là ổ đĩa thường - mở duyệt thư mục
                 start_browse = selected['drive_root']
-                print(f"\n   Mo duyet thu muc trong {selected['label']}...")
-                print(f"   Hay chon hoac tao thu muc de luu backup.")
-                input("   Nhan Enter de bat dau duyet...")
+                print(f"\n   Mở duyệt thư mục trong {selected['label']}...")
+                print(f"   Hãy chọn hoặc tạo thư mục để lưu sao lưu.")
+                input("   Nhấn Enter để bắt đầu duyệt...")
 
                 chosen = browse_folder(start_browse)
                 if chosen is None:
-                    print("   [!] Da huy chon thu muc.")
-                    input("   Nhan Enter de thu lai...")
+                    print("   [!] Đã hủy chọn thư mục.")
+                    input("   Nhấn Enter để thử lại...")
                     continue
 
-                # Tinh toan base va subfolder
+                # Tính toán base và subfolder
                 drive_root = selected['drive_root']
                 if chosen == drive_root:
-                    # Chon chinh o dia - dung ten mac dinh
                     cfg["GOOGLE_DRIVE_PATHS"] = [drive_root]
                     cfg["GOOGLE_DRIVE_SUBFOLDER"] = current_subfolder
                     final_path = os.path.join(drive_root, current_subfolder)
@@ -685,80 +572,80 @@ def update_google_drive():
                         cfg["GOOGLE_DRIVE_PATHS"] = [chosen]
                         final_path = chosen
 
-                # Kiem tra/tao thu muc
+                # Kiểm tra/tạo thư mục
                 if not os.path.exists(final_path):
-                    if confirm(f"   Tao thu muc '{final_path}'? (Y/N): "):
+                    if confirm(f"   Tạo thư mục '{final_path}'? (Y/N): "):
                         try:
                             os.makedirs(final_path, exist_ok=True)
-                            print(f"   [OK] Da tao thu muc: {final_path}")
+                            print(f"   [OK] Đã tạo thư mục: {final_path}")
                         except Exception as e:
-                            print(f"   [!] Loi tao thu muc: {e}")
-                            input("   Nhan Enter de thu lai...")
+                            print(f"   [!] Lỗi tạo thư mục: {e}")
+                            input("   Nhấn Enter để thử lại...")
                             continue
                     else:
-                        print("   [!] Da huy.")
+                        print("   [!] Đã hủy.")
                         continue
 
                 save_config(cfg)
-                print(f"\n   [OK] Da cap nhat duong dan: {drive_root}")
-                print(f"   [OK] Thu muc backup: {final_path}")
-                input("   Nhan Enter de quay lai...")
+                print(f"\n   [OK] Đã cập nhật đường dẫn: {drive_root}")
+                print(f"   [OK] Thư mục sao lưu: {final_path}")
+                input("   Nhấn Enter để quay lại...")
                 return
 
         except ValueError:
-            print("   [!] Nhap khong hop le.")
-            input("   Nhan Enter de thu lai...")
+            print("   [!] Nhập không hợp lệ.")
+            input("   Nhấn Enter để thử lại...")
             continue
 
-# ==================== FEATURE 2: DUYET FILE O GOC (REMOTE) ====================
+# ==================== FEATURE 2: DUYỆT FILE Ở GỐC (REMOTE) ====================
 def browse_remote_files():
-    """Duyet file backup tai thu muc nguon (Remote)"""
+    """Duyệt file backup tại thư mục nguồn (Remote)"""
     clear_screen()
-    print_header("DUYET FILE TAI O DIA GOC (REMOTE)")
+    print_header("DUYỆT FILE TẠI Ổ ĐĨA GỐC (REMOTE)")
 
     cfg = load_config()
     source_dir = cfg["SOURCE_DIR"]
 
-    print(f"\n   Thu muc nguon: {source_dir}")
-    print("   Dang lay danh sach file...\n")
+    print(f"\n   Thư mục nguồn: {source_dir}")
+    print("   Đang lấy danh sách file...\n")
 
     if not os.path.exists(source_dir):
-        print(f"   [!] Khong the truy cap: {source_dir}")
-        print("   [!] Kiem tra lai ket noi mang hoac o dia.")
-        input("\n   Nhan Enter de quay lai...")
+        print(f"   [!] Không thể truy cập: {source_dir}")
+        print("   [!] Kiểm tra lại kết nối mạng hoặc ổ đĩa.")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
     files = get_files_in_dir(source_dir)
 
     if not files:
-        print("   [!] Khong co file nao trong thu muc.")
-        input("\n   Nhan Enter de quay lai...")
+        print("   [!] Không có file nào trong thư mục.")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
-    # Thong ke theo ngay
+    # Thống kê theo ngày
     days = get_unique_days(files)
-    print(f"   Tong cong: {len(files)} file, {len(days)} ngay backup\n")
+    print(f"   Tổng cộng: {len(files)} file, {len(days)} ngày backup\n")
     print_files_table(files)
 
-    print(f"\n   --- THONG KE THEO NGAY ---")
+    print(f"\n   --- THỐNG KÊ THEO NGÀY ---")
     for day_key, day_files in days:
         total_size = sum(f['size'] for f in day_files)
         print(f"   {day_key}: {len(day_files)} file, {format_size(total_size)}")
 
-    input("\n   Nhan Enter de quay lai...")
+    input("\n   Nhấn Enter để quay lại...")
 
-# ==================== FEATURE 3: DUYET FILE GOOGLE DRIVE ====================
+# ==================== FEATURE 3: DUYỆT FILE GOOGLE DRIVE ====================
 def browse_drive_files():
-    """Duyet file backup tai Google Drive"""
+    """Duyệt file backup tại Google Drive"""
     clear_screen()
-    print_header("DUYET FILE TAI GOOGLE DRIVE")
+    print_header("DUYỆT FILE TẠI GOOGLE DRIVE")
 
     cfg = load_config()
     drive_paths = cfg["GOOGLE_DRIVE_PATHS"]
     subfolder = cfg["GOOGLE_DRIVE_SUBFOLDER"]
     profile_path = cfg["GOOGLE_DRIVE_PROFILE_PATH"]
 
-    # Tim duong dan Drive
+    # Tìm đường dẫn Drive
     target_dir = None
     user_profile = os.environ.get("USERPROFILE")
 
@@ -774,57 +661,57 @@ def browse_drive_files():
             target_dir = alt
 
     if not target_dir:
-        print("   [!] Khong tim thay Google Drive!")
-        input("\n   Nhan Enter de quay lai...")
+        print("   [!] Không tìm thấy Google Drive!")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
-    print(f"   Thu muc Drive: {target_dir}")
-    print("   Dang lay danh sach file...\n")
+    print(f"   Thư mục Drive: {target_dir}")
+    print("   Đang lấy danh sách file...\n")
 
     if not os.path.exists(target_dir):
-        print(f"   [!] Thu muc chua ton tai: {target_dir}")
-        input("\n   Nhan Enter de quay lai...")
+        print(f"   [!] Thư mục chưa tồn tại: {target_dir}")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
     files = get_files_in_dir(target_dir)
 
     if not files:
-        print("   [!] Khong co file backup nao tren Drive.")
-        input("\n   Nhan Enter de quay lai...")
+        print("   [!] Không có file backup nào trên Drive.")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
-    # Thong ke theo ngay
+    # Thống kê theo ngày
     days = get_unique_days(files)
-    print(f"   Tong cong: {len(files)} file, {len(days)} ngay backup\n")
+    print(f"   Tổng cộng: {len(files)} file, {len(days)} ngày backup\n")
     print_files_table(files)
 
-    print(f"\n   --- THONG KE THEO NGAY ---")
+    print(f"\n   --- THỐNG KÊ THEO NGÀY ---")
     for day_key, day_files in days:
         total_size = sum(f['size'] for f in day_files)
         print(f"   {day_key}: {len(day_files)} file, {format_size(total_size)}")
 
-    input("\n   Nhan Enter de quay lai...")
+    input("\n   Nhấn Enter để quay lại...")
 
 # ==================== FEATURE 4: DON DEP CA 2 O ====================
 def cleanup_all_drives():
-    """Don dep file backup o ca Remote va Drive, chi chua lai 3 ngay"""
+    """Dọn dẹp file backup ở cả Remote và Drive, chỉ chừa lại 3 ngày"""
     clear_screen()
-    print_header("DON DEP FILE BACKUP (CHUA LAI 3 NGAY MOI NHAT)")
+    print_header("DỌN DẸP FILE BACKUP (CHỪA LẠI 3 NGÀY MỚI NHẤT)")
 
     KEEP_DAYS = 3
     cfg = load_config()
 
-    print(f"\n   [!] SE XOA TAT CA FILE BACKUP CUA HON {KEEP_DAYS} NGAY")
-    print(f"   [!] Chi chua lai {KEEP_DAYS} ngay backup moi nhat")
+    print(f"\n   [!] SẼ XÓA TẤT CẢ FILE BACKUP CỦA HƠN {KEEP_DAYS} NGÀY")
+    print(f"   [!] Chỉ chừa lại {KEEP_DAYS} ngày backup mới nhất")
     print()
 
-    # --- Don dep Remote ---
+    # --- Dọn dẹp Remote ---
     source_dir = cfg["SOURCE_DIR"]
     source_deleted = 0
     source_freed = 0
 
     if os.path.exists(source_dir):
-        print(f"   --- Don dep Remote: {source_dir} ---")
+        print(f"   --- Dọn dẹp Remote: {source_dir} ---")
         files = get_files_in_dir(source_dir)
         if files:
             days = get_unique_days(files)
@@ -832,9 +719,9 @@ def cleanup_all_drives():
 
             for day_key, day_files in days:
                 if day_key in keep_days_list:
-                    print(f"   [GIU] {day_key}: {len(day_files)} file")
+                    print(f"   [GIỮ] {day_key}: {len(day_files)} file")
                 else:
-                    print(f"   [XOA] {day_key}: {len(day_files)} file")
+                    print(f"   [XÓA] {day_key}: {len(day_files)} file")
                     for f in day_files:
                         try:
                             sz = f['size']
@@ -842,15 +729,15 @@ def cleanup_all_drives():
                             source_deleted += 1
                             source_freed += sz
                         except Exception as e:
-                            print(f"      [!] Loi xoa {f['name']}: {e}")
+                            print(f"      [!] Lỗi xóa {f['name']}: {e}")
         else:
-            print("   [!] Khong co file nao tai Remote.")
+            print("   [!] Không có file nào tại Remote.")
     else:
-        print(f"   [!] Khong the truy cap Remote: {source_dir}")
+        print(f"   [!] Không thể truy cập Remote: {source_dir}")
 
     print()
 
-    # --- Don dep Google Drive ---
+    # --- Dọn dẹp Google Drive ---
     drive_paths = cfg["GOOGLE_DRIVE_PATHS"]
     subfolder = cfg["GOOGLE_DRIVE_SUBFOLDER"]
     profile_path = cfg["GOOGLE_DRIVE_PROFILE_PATH"]
@@ -872,7 +759,7 @@ def cleanup_all_drives():
                 drive_dir = alt
 
     if drive_dir and os.path.exists(drive_dir):
-        print(f"   --- Don dep Google Drive: {drive_dir} ---")
+        print(f"   --- Dọn dẹp Google Drive: {drive_dir} ---")
         drive_files = get_files_in_dir(drive_dir)
         if drive_files:
             days = get_unique_days(drive_files)
@@ -880,9 +767,9 @@ def cleanup_all_drives():
 
             for day_key, day_files in days:
                 if day_key in keep_days_list:
-                    print(f"   [GIU] {day_key}: {len(day_files)} file")
+                    print(f"   [GIỮ] {day_key}: {len(day_files)} file")
                 else:
-                    print(f"   [XOA] {day_key}: {len(day_files)} file")
+                    print(f"   [XÓA] {day_key}: {len(day_files)} file")
                     for f in day_files:
                         try:
                             sz = f['size']
@@ -890,87 +777,87 @@ def cleanup_all_drives():
                             drive_deleted += 1
                             drive_freed += sz
                         except Exception as e:
-                            print(f"      [!] Loi xoa {f['name']}: {e}")
+                            print(f"      [!] Lỗi xóa {f['name']}: {e}")
         else:
-            print("   [!] Khong co file nao tren Drive.")
+            print("   [!] Không có file nào trên Drive.")
     else:
-        print("   [!] Khong the truy cap Google Drive.")
+        print("   [!] Không thể truy cập Google Drive.")
 
-    # Tong ket
+    # Tổng kết
     print(f"\n{'='*60}")
-    print(f"   KET QUA DON DEP:")
-    print(f"   Remote:       Xoa {source_deleted} file, giai phong {format_size(source_freed)}")
-    print(f"   Google Drive:  Xoa {drive_deleted} file, giai phong {format_size(drive_freed)}")
+    print(f"   KẾT QUẢ DỌN DẸP:")
+    print(f"   Remote:       Xóa {source_deleted} file, giải phóng {format_size(source_freed)}")
+    print(f"   Google Drive:  Xóa {drive_deleted} file, giải phóng {format_size(drive_freed)}")
     print(f"{'='*60}")
-    input("\n   Nhan Enter de quay lai...")
+    input("\n   Nhấn Enter để quay lại...")
 
 # ==================== FEATURE 5: DUYET & XOA THEO KHOI TAI REMOTE ====================
 def browse_and_delete_remote():
-    """Truy cap Remote, tong hop theo ngay, cho phep chon xoa theo khoi (bat buoc chua lai toi thieu 3 ngay)"""
+    """Truy cập Remote, tổng hợp theo ngày, cho phép chọn xóa theo khối (bắt buộc chừa lại tối thiểu 3 ngày)"""
     clear_screen()
-    print_header("DUYET & XOA THEO KHOI TAI REMOTE")
+    print_header("DUYỆT & XÓA THEO KHỐI TẠI REMOTE")
 
     MIN_KEEP_DAYS = 3
     cfg = load_config()
     source_dir = cfg["SOURCE_DIR"]
 
-    print(f"   Thu muc nguon: {source_dir}")
-    print("   Dang lay danh sach file...\n")
+    print(f"   Thư mục nguồn: {source_dir}")
+    print("   Đang lấy danh sách file...\n")
 
     if not os.path.exists(source_dir):
-        print(f"   [!] Khong the truy cap: {source_dir}")
-        input("\n   Nhan Enter de quay lai...")
+        print(f"   [!] Không thể truy cập: {source_dir}")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
     files = get_files_in_dir(source_dir)
     if not files:
-        print("   [!] Khong co file nao trong thu muc.")
-        input("\n   Nhan Enter de quay lai...")
+        print("   [!] Không có file nào trong thư mục.")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
     days = get_unique_days(files)
     total_days = len(days)
 
-    print(f"   Tong cong {len(files)} file, {total_days} ngay backup\n")
-    print(f"   {'STT':<5} {'Ngay':<15} {'So file':<10} {'Kich thuoc':<15} {'Trang thai':<15}")
+    print(f"   Tổng cộng {len(files)} file, {total_days} ngày backup\n")
+    print(f"   {'STT':<5} {'Ngày':<15} {'Số file':<10} {'Kích thước':<15} {'Trạng thái':<15}")
     print(f"   {'-'*5} {'-'*15} {'-'*10} {'-'*15} {'-'*15}")
 
     for i, (day_key, day_files) in enumerate(days, 1):
         total_size = sum(f['size'] for f in day_files)
-        status = "DUOC GIU" if i <= MIN_KEEP_DAYS else "Co the xoa"
+        status = "ĐƯỢC GIỮ" if i <= MIN_KEEP_DAYS else "Có thể xóa"
         print(f"   {i:<5} {day_key:<15} {len(day_files):<10} {format_size(total_size):<15} {status:<15}")
 
-    print(f"\n   [!] Bat buoc chua lai toi thieu {MIN_KEEP_DAYS} ngay moi nhat (danh so 1-{min(MIN_KEEP_DAYS, total_days)})")
+    print(f"\n   [!] Bắt buộc chừa lại tối thiểu {MIN_KEEP_DAYS} ngày mới nhất (đánh số 1-{min(MIN_KEEP_DAYS, total_days)})")
     print()
 
-    # Cho chon ngay de xoa
+    # Cho chọn ngày để xóa
     max_deletable = total_days - MIN_KEEP_DAYS
     if max_deletable <= 0:
-        print(f"   [!] Chi co {total_days} ngay backup, khong du ngay de xoa (can toi thieu {MIN_KEEP_DAYS}).")
-        input("\n   Nhan Enter de quay lai...")
+        print(f"   [!] Chỉ có {total_days} ngày backup, không đủ ngày để xóa (cần tối thiểu {MIN_KEEP_DAYS}).")
+        input("\n   Nhấn Enter để quay lại...")
         return
 
-    print(f"   Cac ngay co the xoa: {MIN_KEEP_DAYS + 1} den {total_days}")
+    print(f"   Các ngày có thể xóa: {MIN_KEEP_DAYS + 1} đến {total_days}")
 
     while True:
-        print(f"\n   Nhap so thu tu ngay muon xoa (vi du: 4,5,6 hoac 4-8)")
-        print(f"   Nhap 'list' de xem lai, '0' de quay lai menu")
-        choice = input("   Lua chon: ").strip()
+        print(f"\n   Nhập số thứ tự ngày muốn xóa (ví dụ: 4,5,6 hoặc 4-8)")
+        print(f"   Nhập 'list' để xem lại, '0' để quay lại menu")
+        choice = input("   Lựa chọn: ").strip()
 
         if choice == '0':
             return
         if choice.lower() == 'list':
-            # Hien thi lai danh sach
+            # Hiển thị lại danh sách
             clear_screen()
-            print_header("DUYET & XOA THEO KHOI TAI REMOTE")
-            print(f"   {'STT':<5} {'Ngay':<15} {'So file':<10} {'Kich thuoc':<15}")
+            print_header("DUYỆT & XÓA THEO KHỐI TẠI REMOTE")
+            print(f"   {'STT':<5} {'Ngày':<15} {'Số file':<10} {'Kích thước':<15}")
             for i, (day_key, day_files) in enumerate(days, 1):
                 total_size = sum(f['size'] for f in day_files)
-                protected = " (DUOC GIU)" if i <= MIN_KEEP_DAYS else ""
+                protected = " (ĐƯỢC GIỮ)" if i <= MIN_KEEP_DAYS else ""
                 print(f"   {i:<5} {day_key:<15} {len(day_files):<10} {format_size(total_size):<15}{protected}")
             continue
 
-        # Parse lua chon (vi du: "4,5,6" hoac "4-8")
+        # Parse lựa chọn (ví dụ: "4,5,6" hoặc "4-8")
         try:
             selected_indices = set()
             parts = choice.split(',')
@@ -984,25 +871,25 @@ def browse_and_delete_remote():
                 else:
                     selected_indices.add(int(part))
 
-            # Kiem tra xem co chon ngay duoc bao ve khong
+            # Kiểm tra xem có chọn ngày được bảo vệ không
             protected = [idx for idx in selected_indices if idx <= MIN_KEEP_DAYS]
             if protected:
-                print(f"   [!] KHONG THE XOA cac ngay {protected} (bat buoc chua lai {MIN_KEEP_DAYS} ngay!)")
+                print(f"   [!] KHÔNG THỂ XÓA các ngày {protected} (bắt buộc chừa lại {MIN_KEEP_DAYS} ngày!)")
                 continue
 
-            # Kiem tra xem so thu tu hop le khong
+            # Kiểm tra xem số thứ tự hợp lệ không
             invalid = [idx for idx in selected_indices if idx < 1 or idx > total_days]
             if invalid:
-                print(f"   [!] So thu tu khong hop le: {invalid}")
+                print(f"   [!] Số thứ tự không hợp lệ: {invalid}")
                 continue
 
             if not selected_indices:
                 continue
 
-            # Hien thi xac nhan
+            # Hiển thị xác nhận
             total_files_to_delete = 0
             total_size_to_delete = 0
-            print(f"\n   Se xoa {len(selected_indices)} ngay backup sau:")
+            print(f"\n   Sẽ xóa {len(selected_indices)} ngày backup sau:")
             for idx in sorted(selected_indices):
                 day_key, day_files = days[idx - 1]
                 day_size = sum(f['size'] for f in day_files)
@@ -1010,10 +897,10 @@ def browse_and_delete_remote():
                 total_files_to_delete += len(day_files)
                 total_size_to_delete += day_size
 
-            print(f"\n   Tong cong: Xoa {total_files_to_delete} file, giai phong {format_size(total_size_to_delete)}")
+            print(f"\n   Tổng cộng: Xóa {total_files_to_delete} file, giải phóng {format_size(total_size_to_delete)}")
 
-            if confirm("   Xac nhan xoa? (Y/N): "):
-                # Thuc hien xoa
+            if confirm("   Xác nhận xóa? (Y/N): "):
+                # Thực hiện xóa
                 actual_deleted = 0
                 for idx in sorted(selected_indices, reverse=True):
                     day_key, day_files = days[idx - 1]
@@ -1022,57 +909,35 @@ def browse_and_delete_remote():
                             os.remove(f['path'])
                             actual_deleted += 1
                         except Exception as e:
-                            print(f"      [!] Loi xoa {f['name']}: {e}")
-                print(f"\n   [OK] Da xoa {actual_deleted} file thanh cong!")
-                input("   Nhan Enter de quay lai...")
+                            print(f"      [!] Lỗi xóa {f['name']}: {e}")
+                print(f"\n   [OK] Đã xóa {actual_deleted} file thành công!")
+                input("   Nhấn Enter để quay lại...")
                 return
             else:
-                print("   [!] Da huy xoa.")
+                print("   [!] Đã hủy xóa.")
                 continue
 
         except (ValueError, IndexError):
-            print("   [!] Nhap khong hop le. Vi du: 4,5,6 hoac 4-8")
+            print("   [!] Nhập không hợp lệ. Ví dụ: 4,5,6 hoặc 4-8")
             continue
 
 # ==================== MAIN MENU ====================
 def main():
-    # Kiem tra moi truong luc khoi dong
-    env_ok = False
-    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
-    if os.path.exists(setup_env_path):
-        if SCRIPT_DIR not in sys.path:
-            sys.path.insert(0, SCRIPT_DIR)
-        try:
-            import setup_env
-            missing = setup_env.get_missing_critical_packages()
-            if not missing:
-                env_ok = True
-        except Exception:
-            pass
-
     while True:
         clear_screen()
         print_header("SMILE BACKUP MANAGER")
         print()
 
-        # Hien thi trang thai moi truong
-        if env_ok:
-            print("   [OK] Moi truong: San sang")
-        else:
-            print("   [!] Moi truong: Can kiem tra/cai dat thu vien")
-
-        print()
-        print("   1. Chay tu dong backup SMILE")
-        print("   2. Cap nhat duong dan Google Drive")
-        print("   3. Duyet file tai o dia goc (Remote)")
-        print("   4. Duyet file tai Google Drive")
-        print("   5. Don dep file backup (chua lai 3 ngay moi nhat)")
-        print("   6. Duyet & xoa theo khoi tai Remote")
-        print("   7. Kiem tra & cai dat moi truong")
-        print("   0. Thoat")
+        print("   1. Chạy tự động backup SMILE")
+        print("   2. Cập nhật đường dẫn Google Drive")
+        print("   3. Duyệt file tại ổ đĩa gốc (Remote)")
+        print("   4. Duyệt file tại Google Drive")
+        print("   5. Dọn dẹp file backup (chừa lại 3 ngày mới nhất)")
+        print("   6. Duyệt & xóa theo khối tại Remote")
+        print("   0. Thoát")
         print()
 
-        choice = input("   Chon chuc nang [0-7]: ").strip()
+        choice = input("   Chọn chức năng [0-6]: ").strip()
 
         if choice == '1':
             run_auto_backup()
@@ -1086,22 +951,12 @@ def main():
             cleanup_all_drives()
         elif choice == '6':
             browse_and_delete_remote()
-        elif choice == '7':
-            full_environment_check_and_fix()
-            # Update env status after check/install
-            if os.path.exists(setup_env_path):
-                try:
-                    import setup_env
-                    missing = setup_env.get_missing_critical_packages()
-                    env_ok = len(missing) == 0
-                except Exception:
-                    env_ok = False
         elif choice == '0':
-            print("\n   Tam biet!")
+            print("\n   Tạm biệt!")
             time.sleep(1)
             break
         else:
-            print("   [!] Lua chon khong hop le.")
+            print("   [!] Lựa chọn không hợp lệ.")
             time.sleep(1)
 
 if __name__ == "__main__":

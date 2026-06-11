@@ -69,7 +69,7 @@ class autoBackupSMILE:
         """Hiển thị thanh thông báo màu đỏ trên cùng màn hình"""
         def create_overlay():
             self.overlay = tk.Tk()
-            self.overlay.title("SMILE BACKUP WARNING")
+            self.overlay.title("CẢNH BÁO SAO LƯU SMILE")
             width = self.overlay.winfo_screenwidth()
             # Đặt ở sát mép trên, cao 35px
             self.overlay.geometry(f"{width}x35+0+0")
@@ -78,21 +78,21 @@ class autoBackupSMILE:
             self.overlay.configure(bg='red')
 
             label = tk.Label(self.overlay,
-                            text="⚠️ HỆ THỐNG ĐANG TỰ ĐỘNG BACKUP SMILE - VUI LÒNG KHÔNG THAO TÁC ⚠️",
+                            text="⚠️ HỆ THỐNG ĐANG TỰ ĐỘNG SAO LƯU SMILE - VUI LÒNG KHÔNG THAO TÁC ⚠️",
                             fg="white", bg="red", font=("Arial", 12, "bold"))
             label.pack(expand=True)
             self.overlay.mainloop()
 
         self.overlay_thread = threading.Thread(target=create_overlay, daemon=True)
         self.overlay_thread.start()
-        print("   [!] Đang hiển thị cảnh báo trên màn hình.")
+        self.log_message("   [!] Đang hiển thị cảnh báo trên màn hình.")
 
     def hide_warning_overlay(self):
         """Tắt thanh thông báo"""
         if self.overlay:
             try:
                 self.overlay.after(0, self.overlay.destroy)
-                print("   [OK] Đã tắt cảnh báo màn hình.")
+                self.log_message("   [OK] Đã tắt cảnh báo trên màn hình.")
             except: pass
 
     # ===================== Desktop Active Check =====================
@@ -103,22 +103,21 @@ class autoBackupSMILE:
             result = subprocess.run('tasklist /FI "IMAGENAME eq explorer.exe"',
                                   shell=True, capture_output=True, text=True)
             if "explorer.exe" not in result.stdout:
-                self.log_message("   [!] Desktop không khả dụng (không thấy explorer.exe)")
+                self.log_message("   [!] Màn hình nền không hoạt động (không thấy explorer.exe)")
                 return False
 
             # Kiểm tra foreground window
             hwinst = ctypes.windll.user32.GetForegroundWindow()
             if hwinst == 0:
-                self.log_message("   [!] Foreground window = 0, thử kích hoạt desktop...")
+                self.log_message("   [!] Không tìm thấy cửa sổ hoạt động, đang kích hoạt màn hình...")
                 self._wake_desktop()
                 time.sleep(2)
                 hwinst = ctypes.windll.user32.GetForegroundWindow()
                 if hwinst == 0:
-                    self.log_message("   [!] Desktop vẫn không khả dụng sau khi thử kích hoạt")
+                    self.log_message("   [!] Màn hình nền vẫn không hoạt động sau khi kích hoạt")
                     return False
             return True
-        except Exception as e:
-            self.log_message(f"   [!] Lỗi kiểm tra desktop: {e}")
+        except Exception:
             return True  # Tiếp tục nếu không chắc chắn
 
     def _wake_desktop(self):
@@ -183,27 +182,24 @@ class autoBackupSMILE:
         for attempt in range(max_retries):
             # Phương pháp 1: click_input (ưu tiên - chính xác nhất)
             try:
-                self.log_message(f"   [Action] Click {coords} (lần thử {attempt+1}/{max_retries})...")
                 self.ensure_foreground(window)
                 time.sleep(0.3)
                 window.click_input(coords=coords)
                 time.sleep(0.5)
                 return True
-            except Exception as e:
-                self.log_message(f"   [!] Lỗi click_input {coords}: {e}")
+            except Exception:
+                pass
 
             # Phương pháp 2: click() method (kém chính xác hơn nhưng bỏ qua trạng thái window)
             try:
-                self.log_message(f"   [Action] Thử click() fallback...")
                 window.click(coords=coords)
                 time.sleep(0.5)
                 return True
-            except Exception as e2:
-                self.log_message(f"   [!] Lỗi click() fallback: {e2}")
+            except Exception:
+                pass
 
             # Phương pháp 3: ctypes mouse_event (độc lập với pywinauto)
             try:
-                self.log_message(f"   [Action] Thử ctypes mouse_event...")
                 rect = window.rectangle()
                 abs_x = rect.left + coords[0]
                 abs_y = rect.top + coords[1]
@@ -213,15 +209,14 @@ class autoBackupSMILE:
                 ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)  # LEFTUP
                 time.sleep(0.5)
                 return True
-            except Exception as e3:
-                self.log_message(f"   [!] Lỗi ctypes mouse: {e3}")
+            except Exception:
+                pass
 
             # Thử lại sau delay
             if attempt < max_retries - 1:
-                self.log_message(f"   [...] Thử lại click sau {retry_delay} giây...")
                 time.sleep(retry_delay)
 
-        self.log_message(f"   [X] Không thể click {coords} sau {max_retries} lần thử")
+        self.log_message(f"   [!] Không thể chọn tùy chọn tại tọa độ {coords} sau {max_retries} lần thử.")
         return False
 
     # ===================== OK Button After Backup =====================
@@ -231,15 +226,12 @@ class autoBackupSMILE:
         retry_delay = self.BACKUP_OK_RETRY_DELAY
 
         for attempt in range(max_retries):
-            self.log_message(f"   [Action] Xác nhận OK sau backup (lần {attempt+1}/{max_retries})...")
-
             # Phương pháp 1: Gửi phím ENTER (OK là default button trong dialog)
             try:
                 top = self.app.top_window()
                 self.ensure_foreground(top)
                 time.sleep(0.5)
                 send_keys("{ENTER}")
-                self.log_message(f"   [OK] Đã gửi ENTER lần {attempt+1}")
                 time.sleep(2)
 
                 # Kiểm tra xem dialog đã biến mất chưa
@@ -248,13 +240,11 @@ class autoBackupSMILE:
                     if top_after.window_text() == top.window_text():
                         pass  # Dialog vẫn còn, thử thêm
                     else:
-                        self.log_message(f"   [OK] Xác nhận OK thành công (ENTER)!")
                         return True
                 except:
-                    self.log_message(f"   [OK] Xác nhận OK thành công (ENTER)!")
                     return True
-            except Exception as e:
-                self.log_message(f"   [!] Lỗi send_keys ENTER: {e}")
+            except Exception:
+                pass
 
             # Phương pháp 2: Click tọa độ OK bằng robust_click
             try:
@@ -262,9 +252,9 @@ class autoBackupSMILE:
                 result = self.robust_click(top, self.OK_BTN_COORDS, max_retries=1)
                 if result:
                     time.sleep(2)
-                    self.log_message(f"   [OK] Đã click tọa độ OK lần {attempt+1}")
-            except Exception as e:
-                self.log_message(f"   [!] Lỗi click OK: {e}")
+                    return True
+            except Exception:
+                pass
 
             # Phương pháp 3: ctypes mouse_event trực tiếp
             try:
@@ -277,11 +267,12 @@ class autoBackupSMILE:
                 ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)  # LEFTDOWN
                 ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)  # LEFTUP
                 time.sleep(2)
+                return True
             except: pass
 
             time.sleep(retry_delay)
 
-        self.log_message(f"   [X] Không thể xác nhận OK sau {max_retries} lần thử, tiếp tục quy trình...")
+        self.log_message(f"   [!] Không thể xác nhận OK tự động sau {max_retries} lần thử.")
         return False
 
     def focus_terminal(self):
@@ -292,12 +283,10 @@ class autoBackupSMILE:
                 ctypes.windll.user32.ShowWindow(hWnd, 9) # SW_RESTORE
                 ctypes.windll.user32.SetForegroundWindow(hWnd)
                 ctypes.windll.user32.SetWindowPos(hWnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)
-                print("   --> Đã đưa Terminal lên trên cùng.")
         except Exception: pass
 
     def kill_smile(self):
         """Kiểm tra và đóng SMILE nếu đang chạy để đảm bảo khởi động sạch"""
-        print("   --> Kiểm tra và đóng SMILE FO nếu đang chạy...")
         try:
             subprocess.run("taskkill /F /IM SMILEFO.exe /T", shell=True, capture_output=True)
             time.sleep(1)
@@ -309,7 +298,7 @@ class autoBackupSMILE:
         for drive_path in CFG["GOOGLE_DRIVE_PATHS"]:
             if os.path.exists(drive_path):
                 full_path = os.path.join(drive_path, CFG["GOOGLE_DRIVE_SUBFOLDER"])
-                self.log_message(f"   [OK] Tìm thấy Google Drive tại: {drive_path}")
+                self.log_message(f"   [OK] Đã tìm thấy Google Drive tại: {drive_path}")
                 return full_path
 
         # 2. Kiểm tra đường dẫn USERPROFILE
@@ -317,7 +306,7 @@ class autoBackupSMILE:
         if user_profile:
             default_path = os.path.join(user_profile, CFG["GOOGLE_DRIVE_PROFILE_PATH"])
             if os.path.exists(os.path.dirname(default_path)):
-                self.log_message(f"   [OK] Tìm thấy Google Drive tại USERPROFILE")
+                self.log_message(f"   [OK] Đã tìm thấy Google Drive trong thư mục người dùng")
                 return default_path
 
         return None
@@ -332,7 +321,6 @@ class autoBackupSMILE:
                 copied = 0
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-                    print(f"   --> Đang đẩy file: {os.path.basename(dst)}")
                     while True:
                         chunk = fsrc.read(1024 * 1024)
                         if not chunk: break
@@ -340,23 +328,32 @@ class autoBackupSMILE:
                         copied += len(chunk)
                         percent = (copied / total_size) * 100
                         print(f"\r   [Đang tải lên Drive]: {percent:.1f}%", end="")
-                print(f"\n   [OK] Đã hoàn tất đẩy file lên Drive.")
+                print()
+                self.log_message("   [OK] Đã tải thành công file lên Drive.")
                 return True
-            except Exception as e:
+            except Exception:
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(RETRY_DELAY)
                     continue
                 return False
         return False
 
-    def log_message(self, message):
-        """In ra màn hình và đồng thời ghi vào tệp backup_log.txt"""
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = f"[{now}] {message}"
-        print(message)
-        log_path = os.path.join(SCRIPT_DIR, "backup_log.txt")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(log_entry + "\n")
+    def log_message(self, message, to_file=False, raw=False):
+        """In ra màn hình và tùy chọn ghi vào tệp backup_log.txt (mặc định False để gọn log)"""
+        if raw:
+            print(message)
+            if to_file:
+                log_path = os.path.join(SCRIPT_DIR, "backup_log.txt")
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(message + "\n")
+        else:
+            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_entry = f"[{now}] {message}"
+            print(message)
+            if to_file:
+                log_path = os.path.join(SCRIPT_DIR, "backup_log.txt")
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(log_entry + "\n")
 
     # ===================== Get Window Safe =====================
     def get_main_window_safe(self, timeout=None, retry_interval=None):
@@ -370,52 +367,56 @@ class autoBackupSMILE:
             try:
                 main_window = self.app.top_window()
                 if main_window.handle:
-                    self.log_message(f"   [OK] Đã lấy cửa sổ SMILE (hwnd={main_window.handle})")
                     return main_window
-            except Exception as e:
-                self.log_message(f"   [!] Lỗi lấy cửa sổ (lần {attempt+1}): {e}")
+            except Exception:
+                pass
 
             # Kiểm tra process SMILE còn chạy không
             try:
                 result = subprocess.run('tasklist /FI "IMAGENAME eq SMILEFO.exe"',
                                       shell=True, capture_output=True, text=True)
                 if "SMILEFO.exe" not in result.stdout:
-                    self.log_message("   [!] Process SMILE không còn chạy!")
+                    self.log_message("   [!] Tiến trình SMILE không hoạt động!")
                     return None
             except: pass
 
             time.sleep(retry_interval)
 
-        self.log_message("   [X] Không thể lấy cửa sổ SMILE sau thời gian chờ")
+        self.log_message("   [!] Không tìm thấy cửa sổ SMILE sau thời gian chờ.")
         return None
 
     def run(self):
         try:
             self.show_warning_overlay()
-            self.log_message("\n[Step 0] Kiểm tra kết nối...")
+            self.log_message("==================================================", to_file=True, raw=True)
+            self.log_message("BẮT ĐẦU TỰ ĐỘNG SAO LƯU SMILE", to_file=True)
+            self.log_message("\n[Bước 0] Đang kiểm tra các kết nối...")
 
             # Kiểm tra Source Dir
             if not os.path.exists(self.SOURCE_DIR):
-                self.log_message(f"[!] LỖI: Không tìm thấy thư mục nguồn: {self.SOURCE_DIR}")
+                self.log_message(f"[!] LỖI: Không tìm thấy thư mục nguồn: {self.SOURCE_DIR}", to_file=True)
+                self.log_message("==================================================\n", to_file=True, raw=True)
                 return
 
             # Kiểm tra Google Drive
             drive_path = self.find_google_drive_path()
             if not drive_path:
-                self.log_message("[!] LỖI: Không tìm thấy Google Drive.")
+                self.log_message("[!] LỖI: Không tìm thấy Google Drive.", to_file=True)
+                self.log_message("==================================================\n", to_file=True, raw=True)
                 return
 
             # Kiểm tra desktop khả dụng
             if not self.is_desktop_active():
-                self.log_message("[!] CẢNH BÁO: Desktop không khả dụng, thử kích hoạt...")
+                self.log_message("[!] CẢNH BÁO: Màn hình không phản hồi, đang thử kích hoạt...")
                 self._wake_desktop()
                 time.sleep(3)
                 if not self.is_desktop_active():
-                    self.log_message("[!] LỖI: Desktop không khả dụng, không thể tiếp tục.")
+                    self.log_message("[!] LỖI: Màn hình không khả dụng, không thể tiếp tục.", to_file=True)
+                    self.log_message("==================================================\n", to_file=True, raw=True)
                     return
 
             # STEP 1: Khởi động SMILE
-            self.log_message(f"--- BẮT ĐẦU QUY TRÌNH SMILE ---")
+            self.log_message("--- BẮT ĐẦU VẬN HÀNH SAO LƯU SMILE ---")
             self.kill_smile()
             self.app = Application(backend="win32").start(self.SMILE_PATH)
             time.sleep(self.SMILE_STARTUP_WAIT)
@@ -423,7 +424,8 @@ class autoBackupSMILE:
             # Login 1 - với retry
             main_window = self.get_main_window_safe()
             if not main_window:
-                self.log_message("[!] LỖI: Không thể lấy cửa sổ SMILE sau khi khởi động!")
+                self.log_message("[!] LỖI: Không khởi động được phần mềm SMILE!", to_file=True)
+                self.log_message("==================================================\n", to_file=True, raw=True)
                 return
 
             self.ensure_foreground(main_window)
@@ -439,7 +441,8 @@ class autoBackupSMILE:
             # Lấy cửa sổ chính sau khi Login
             main_window = self.get_main_window_safe(timeout=15, retry_interval=2)
             if not main_window:
-                self.log_message("[!] LỖI: Không thể lấy cửa sổ SMILE sau khi login!")
+                self.log_message("[!] LỖI: Đăng nhập vào phần mềm SMILE thất bại!", to_file=True)
+                self.log_message("==================================================\n", to_file=True, raw=True)
                 return
 
             self.ensure_foreground(main_window)
@@ -462,13 +465,13 @@ class autoBackupSMILE:
 
             # Chờ Backup
             wait_time = self.BACKUP_DURATION + 30
-            self.log_message(f"[Step 6] TỰ ĐỘNG: Đang đợi backup ({wait_time} giây)...")
+            self.log_message(f"[Bước 6] Đang tiến hành sao lưu (đợi {wait_time} giây)...")
             for i in range(wait_time, 0, -1):
-                if i % 30 == 0: self.log_message(f"   --> Còn {i} giây...")
+                if i % 30 == 0: self.log_message(f"   --> Thời gian còn lại: {i} giây...")
                 time.sleep(1)
 
             # Click OK sau backup
-            self.log_message("   --> Xác nhận OK sau backup...")
+            self.log_message("   --> Đang xác nhận hoàn tất sao lưu...")
             self.click_ok_after_backup()
 
             time.sleep(1)
@@ -480,34 +483,43 @@ class autoBackupSMILE:
                     send_keys(self.SMILE_EXIT_KEY)
                     time.sleep(1)
                     break
-                except Exception as e:
-                    self.log_message(f"   [!] Lỗi thoát SMILE (lần {exit_attempt+1}): {e}")
+                except Exception:
                     time.sleep(2)
 
             # STEP 7: Đẩy lên Drive
             self.focus_terminal()
-            self.log_message("[Step 7] Đang đồng bộ file backup mới nhất lên Google Drive...")
+            self.log_message("[Bước 7] Đang đồng bộ file sao lưu mới nhất lên Google Drive...")
             files = [os.path.join(self.SOURCE_DIR, f) for f in os.listdir(self.SOURCE_DIR) if os.path.isfile(os.path.join(self.SOURCE_DIR, f))]
             if files:
                 latest = max(files, key=os.path.getmtime)
                 base, ext = os.path.splitext(os.path.basename(latest))
                 new_filename = f"{base}_BOT{ext}"
-                self.log_message(f"   --> Đang tải lên file: {new_filename}")
-                self.copy_with_progress(latest, os.path.join(drive_path, new_filename))
+                self.log_message(f"--> Tải lên file: {new_filename}", to_file=True)
+                
+                success = self.copy_with_progress(latest, os.path.join(drive_path, new_filename))
+                if success:
+                    self.log_message("[+] HOÀN TẤT SAO LƯU SMILE THÀNH CÔNG.", to_file=True)
+                else:
+                    self.log_message("[!] LỖI: Đồng bộ dữ liệu lên Google Drive thất bại.", to_file=True)
             else:
-                self.log_message("   [-] Không thấy file backup tại remote.")
+                self.log_message("[-] LỖI: Không tìm thấy file sao lưu mới nhất.", to_file=True)
 
-            self.log_message(f"[+] HOÀN TẤT BACKUP SMILE.")
+            self.log_message("==================================================\n", to_file=True, raw=True)
 
             # Đóng SMILE sau khi hoàn tất quy trình
             self.kill_smile()
 
         except Exception as e:
-            self.log_message(f"!! Lỗi: {e}")
+            self.log_message("[!] Đã xảy ra lỗi trong quá trình tự động sao lưu.", to_file=True)
+            log_path = os.path.join(SCRIPT_DIR, "backup_log.txt")
+            with open(log_path, "a", encoding="utf-8") as f:
+                import traceback
+                f.write(f"Detailed Error: {str(e)}\n")
+                traceback.print_exc(file=f)
             time.sleep(5)
         finally:
             self.hide_warning_overlay()
-            self.log_message(f"\n[!] Hệ thống sẽ tự động đóng toàn bộ Terminal trong {self.TERMINAL_CLOSE_DELAY} giây...")
+            self.log_message(f"\n[!] Hệ thống sẽ tự động đóng cửa sổ điều khiển trong {self.TERMINAL_CLOSE_DELAY} giây...")
             time.sleep(self.TERMINAL_CLOSE_DELAY)
             subprocess.run("taskkill /F /IM cmd.exe", shell=True)
 
