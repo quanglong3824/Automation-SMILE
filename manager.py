@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import sys
 import datetime
 import shutil
 import ctypes
@@ -8,7 +9,13 @@ import string
 import subprocess
 
 # ==================== LOAD CONFIG ====================
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Ho tro ca chay tu Python source va PyInstaller EXE
+if getattr(sys, 'frozen', False):
+    # Chay tu PyInstaller EXE - lay thu muc cha cua EXE
+    SCRIPT_DIR = os.path.dirname(sys.executable)
+else:
+    # Chay tu Python source - lay thu muc cua script
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "config.json")
 
 def load_config():
@@ -239,6 +246,193 @@ def confirm(prompt):
         if val in ['n', 'no', 'khong']:
             return False
         print("   [!] Vui long nhap Y/N.")
+
+# ==================== ENVIRONMENT CHECK & AUTO INSTALL ====================
+def check_environment():
+    """Kiem tra moi truong va bao cao"""
+    # Import setup_env tu cung thu muc
+    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
+    if not os.path.exists(setup_env_path):
+        print(f"\n   [!] Khong tim thay file setup_env.py tai: {setup_env_path}")
+        input("   Nhan Enter de quay lai...")
+        return
+
+    # Them SCRIPT_DIR vao sys.path tam thoi
+    if SCRIPT_DIR not in sys.path:
+        sys.path.insert(0, SCRIPT_DIR)
+
+    try:
+        import setup_env
+        # Goi ham kiem tra moi truong
+        results = setup_env.full_environment_check()
+        all_ok = setup_env.print_environment_report(results)
+
+        if not all_ok:
+            missing = setup_env.get_missing_critical_packages()
+            print(f"   Cac thu vien con thieu: {', '.join(p['package'] for p in missing)}")
+            answer = input("\n   Ban co muon tu dong cai dat? (Y/N): ").strip().lower()
+            if answer in ['y', 'yes', 'co']:
+                success, failed = setup_env.auto_install_missing(
+                    progress_callback=lambda msg: print(f"   {msg}")
+                )
+                print(f"\n   Da cai dat: {success} thu vien")
+                if failed:
+                    print(f"   That bai: {', '.join(p['package'] for p in failed)}")
+                    print("   Vui long cai dat thu cong bang lenh:")
+                    for p in failed:
+                        print(f"     pip install {p['package']}")
+                else:
+                    print("   [OK] Tat ca da san sang!")
+                input("\n   Nhan Enter de quay lai...")
+        else:
+            input("\n   Nhan Enter de quay lai...")
+    except Exception as e:
+        print(f"\n   [!] Loi kiem tra moi truong: {e}")
+        import traceback
+        traceback.print_exc()
+        input("\n   Nhan Enter de quay lai...")
+
+def run_auto_backup():
+    """Chay auto backup SMILE"""
+    clear_screen()
+    print_header("CHAY TU DONG BACKUP SMILE")
+
+    # Kiem tra moi truong truoc khi chay
+    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
+    if os.path.exists(setup_env_path):
+        if SCRIPT_DIR not in sys.path:
+            sys.path.insert(0, SCRIPT_DIR)
+        try:
+            import setup_env
+            missing = setup_env.get_missing_critical_packages()
+            if missing:
+                print(f"\n   [!] THIEU THU VIEN! Cac thu vien sau chua duoc cai dat:")
+                for p in missing:
+                    print(f"       - {p['package']} ({p['description']})")
+                print(f"\n   Vui long chon menu '7' de kiem tra va cai dat moi truong truoc.")
+                input("\n   Nhan Enter de quay lai...")
+                return
+        except Exception:
+            pass  # Neu khong import duoc, tiep tuc chay binh thuong
+
+    auto_script = os.path.join(SCRIPT_DIR, "autoBackupSMILE.py")
+    if not os.path.exists(auto_script):
+        print(f"\n   [!] Khong tim thay file: {auto_script}")
+        input("   Nhan Enter de quay lai...")
+        return
+
+    print(f"\n   Script: {auto_script}")
+    print(f"   Dang khoi dong tu dong backup SMILE...")
+    print(f"   (Nhan Ctrl+C de dung lai neu can)")
+    print()
+
+    # Kiem tra xem dang chay tu EXE (PyInstaller) hay Python source
+    is_frozen = getattr(sys, 'frozen', False)
+
+    try:
+        if is_frozen:
+            # Chay tu EXE - import autoBackupSMILE nhu module
+            if SCRIPT_DIR not in sys.path:
+                sys.path.insert(0, SCRIPT_DIR)
+            import importlib
+            auto_module = importlib.import_module("autoBackupSMILE")
+            bot = auto_module.autoBackupSMILE()
+            bot.run()
+            print(f"\n   [OK] Auto backup da hoan thanh thanh cong!")
+        else:
+            # Chay tu Python source - dung subprocess de bao ly do rieng
+            result = subprocess.run(
+                [sys.executable, auto_script],
+                cwd=SCRIPT_DIR,
+                timeout=None
+            )
+            if result.returncode == 0:
+                print(f"\n   [OK] Auto backup da hoan thanh thanh cong!")
+            else:
+                print(f"\n   [!] Auto backup da thoat voi ma: {result.returncode}")
+    except KeyboardInterrupt:
+        print("\n   [!] Da dung lai boi nguoi dung.")
+    except SystemExit:
+        print("\n   [!] Script da thoat.")
+    except Exception as e:
+        print(f"\n   [!] Loi khi chay auto backup: {e}")
+        import traceback
+        traceback.print_exc()
+
+    input("\n   Nhan Enter de quay lai menu...")
+
+def full_environment_check_and_fix():
+    """Kiem tra moi truong day du va tu dong cai dat neu can"""
+    clear_screen()
+    print_header("KIEM TRA & CAI DAT MOI TRUONG")
+    print()
+    print("   Dang kiem tra moi truong...")
+    print()
+
+    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
+    if not os.path.exists(setup_env_path):
+        print(f"   [!] Khong tim thay file setup_env.py tai: {setup_env_path}")
+        input("   Nhan Enter de quay lai...")
+        return
+
+    if SCRIPT_DIR not in sys.path:
+        sys.path.insert(0, SCRIPT_DIR)
+
+    try:
+        import setup_env
+        results = setup_env.full_environment_check()
+        all_ok = setup_env.print_environment_report(results)
+
+        if not all_ok:
+            missing = setup_env.get_missing_critical_packages()
+            print(f"   Cac thu vien con thieu:")
+            for p in missing:
+                print(f"     - {p['package']}: {p['description']} (cho {p['required_by']})")
+
+            print(f"\n   Ban co muon tu dong cai dat tat ca thu vien con thieu? (Y/N)")
+            answer = input("   Lua chon: ").strip().lower()
+
+            if answer in ['y', 'yes', 'co']:
+                print()
+                success, failed = setup_env.auto_install_missing(
+                    progress_callback=lambda msg: print(f"   {msg}")
+                )
+
+                print(f"\n   {'='*50}")
+                print(f"   Ket qua cai dat:")
+                print(f"   - Thanh cong: {success} thu vien")
+                if failed:
+                    print(f"   - That bai: {len(failed)} thu vien")
+                    for p in failed:
+                        print(f"     X {p['package']}: {p['description']}")
+                    print(f"\n   Cai dat thu cong bang lenh:")
+                    for p in failed:
+                        print(f"     pip install {p['package']}")
+                else:
+                    print(f"   [OK] Tat ca thu vien da duoc cai dat thanh cong!")
+                print(f"   {'='*50}")
+
+                # Kiem tra lai sau khi cai dat
+                print(f"\n   Dang kiem tra lai moi truong...")
+                results2 = setup_env.full_environment_check()
+                all_ok2 = setup_env.print_environment_report(results2)
+
+                if all_ok2:
+                    print("\n   [OK] MOI TRUONG DA SAN SANG! Ban co the chay auto backup.")
+                else:
+                    print("\n   [!] Van con loi. Vui long kiem tra thu cong.")
+            else:
+                print("\n   [!] Da huy cai dat. Mot so chuc nang co the khong hoat dong.")
+        else:
+            print("\n   [OK] MOI TRUONG SAN SANG! Tat ca thu vien da du day du.")
+            print("   Ban co the chay auto backup binh thuong.")
+
+        input("\n   Nhan Enter de quay lai menu...")
+    except Exception as e:
+        print(f"\n   [!] Loi kiem tra moi truong: {e}")
+        import traceback
+        traceback.print_exc()
+        input("\n   Nhan Enter de quay lai...")
 
 # ==================== FEATURE 1: CAP NHAT GOOGLE DRIVE ====================
 def update_google_drive():
@@ -842,30 +1036,66 @@ def browse_and_delete_remote():
 
 # ==================== MAIN MENU ====================
 def main():
+    # Kiem tra moi truong luc khoi dong
+    env_ok = False
+    setup_env_path = os.path.join(SCRIPT_DIR, "setup_env.py")
+    if os.path.exists(setup_env_path):
+        if SCRIPT_DIR not in sys.path:
+            sys.path.insert(0, SCRIPT_DIR)
+        try:
+            import setup_env
+            missing = setup_env.get_missing_critical_packages()
+            if not missing:
+                env_ok = True
+        except Exception:
+            pass
+
     while True:
         clear_screen()
         print_header("SMILE BACKUP MANAGER")
         print()
-        print("   1. Cap nhat duong dan Google Drive")
-        print("   2. Duyet file tai o dia goc (Remote)")
-        print("   3. Duyet file tai Google Drive")
-        print("   4. Don dep file backup (chua lai 3 ngay moi nhat)")
-        print("   5. Duyet & xoa theo khoi tai Remote")
+
+        # Hien thi trang thai moi truong
+        if env_ok:
+            print("   [OK] Moi truong: San sang")
+        else:
+            print("   [!] Moi truong: Can kiem tra/cai dat thu vien")
+
+        print()
+        print("   1. Chay tu dong backup SMILE")
+        print("   2. Cap nhat duong dan Google Drive")
+        print("   3. Duyet file tai o dia goc (Remote)")
+        print("   4. Duyet file tai Google Drive")
+        print("   5. Don dep file backup (chua lai 3 ngay moi nhat)")
+        print("   6. Duyet & xoa theo khoi tai Remote")
+        print("   7. Kiem tra & cai dat moi truong")
         print("   0. Thoat")
         print()
 
-        choice = input("   Chon chuc nang [0-5]: ").strip()
+        choice = input("   Chon chuc nang [0-7]: ").strip()
 
         if choice == '1':
-            update_google_drive()
+            run_auto_backup()
         elif choice == '2':
-            browse_remote_files()
+            update_google_drive()
         elif choice == '3':
-            browse_drive_files()
+            browse_remote_files()
         elif choice == '4':
-            cleanup_all_drives()
+            browse_drive_files()
         elif choice == '5':
+            cleanup_all_drives()
+        elif choice == '6':
             browse_and_delete_remote()
+        elif choice == '7':
+            full_environment_check_and_fix()
+            # Update env status after check/install
+            if os.path.exists(setup_env_path):
+                try:
+                    import setup_env
+                    missing = setup_env.get_missing_critical_packages()
+                    env_ok = len(missing) == 0
+                except Exception:
+                    env_ok = False
         elif choice == '0':
             print("\n   Tam biet!")
             time.sleep(1)

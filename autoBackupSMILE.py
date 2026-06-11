@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import sys
 import shutil
 import datetime
 import tkinter as tk
@@ -11,7 +12,11 @@ from pywinauto import Application, mouse, timings
 from pywinauto.keyboard import send_keys
 
 # ==================== LOAD CONFIG ====================
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Ho tro ca chay tu Python source va PyInstaller EXE
+if getattr(sys, 'frozen', False):
+    SCRIPT_DIR = os.path.dirname(sys.executable)
+else:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "config.json")
 
 def load_config():
